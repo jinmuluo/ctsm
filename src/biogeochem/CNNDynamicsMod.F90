@@ -39,6 +39,7 @@ module CNNDynamicsMod
   use ColumnType                      , only : col                
   use PatchType                       , only : patch                
   use perf_mod                        , only : t_startf, t_stopf
+  use clm_varctl           , only: use_fan, fan_to_bgc
   use FanMod
   !
   implicit none
@@ -139,7 +140,6 @@ contains
        waterfluxbulk_inst, frictionvel_inst)
     use CNSharedParamsMod    , only: use_fun
     !KO
-    use clm_varctl           , only: use_fan
 !   use subgridAveMod        , only: p2c
     use clm_time_manager     , only: get_step_size, get_curr_date, get_curr_calday, get_nstep
 
@@ -608,7 +608,6 @@ contains
           call update_npool(tg, ratm, theta, thetasat, infiltr_m_s, evap_m_s, &
                wateratm2lndbulk_inst%forc_q_downscaled_col(c), watertend, &
                runoff_m_s, fert_generic, (/0.0_r8/), water_init_fert, bsw, &
-               !(/360*24*3600.0_r8/), (/10**(-6.0_r8)/), dz_layer_fert, ns%tan_f3_col(c:c), fluxes3(1:5,1:1), &
                (/360*24*3600.0_r8/), (/10**(-ph_crop)/), dz_layer_fert, ns%tan_f3_col(c:c), fluxes3(1:5,1:1), &
                garbage, dt/num_substeps, status, numpools=1)
           if (status /= 0) then
@@ -773,10 +772,10 @@ contains
     real(r8) :: tempr_ave, windspeed_ave ! windspeed and temperature averaged over agricultural patches
     real(r8) :: tempr_barns, tempr_stores, vent_barns, flux_grass_crop, tempr_min_10day, &
          flux_grass_graze, flux_grass_spread, flux_grass_spread_tan, flux_grass_crop_tan
-    real(r8) :: cumflux, totalinput, total_to_store
+    real(r8) :: cumflux, totalinput, total_to_store, total_to_store_tan
     real(r8) :: fluxes_nitr(4,2), fluxes_tan(4,2)
     ! The fraction of manure applied continuously on grasslands (if present in the gridcell)
-    real(r8), parameter :: fract_continuous = 0.1_r8, kg_to_g = 1e3_r8, max_grazing_fract = 0.65_r8, &
+    real(r8), parameter :: fract_spread_grass = 0.1_r8, kg_to_g = 1e3_r8, max_grazing_fract = 0.65_r8, &
          volat_coef_barns_open = 0.03_r8, volat_coef_barns_closed = 0.025, volat_coef_stores = 0.025_r8, &
          tempr_min_grazing = 283.0_r8!!!!
 
@@ -908,8 +907,12 @@ contains
                 ! Simplification as of 2019: no explicit manure storage. Flux to storage
                 ! will be spread "immediately".
                 total_to_store = sum(fluxes_nitr(iflx_to_store,:))
-                flux_grass_spread = flux_grass_spread + total_to_store*col%wtgcell(c)
-                flux_grass_spread_tan = flux_grass_spread_tan + sum(fluxes_tan(iflx_to_store,:))*col%wtgcell(c)
+                total_to_store_tan = sum(fluxes_tan(iflx_to_store,:))
+                n_manure_spread_col(c) = (1.0_r8 - fract_spread_grass) * total_to_store
+                tan_manure_spread_col(c) = (1.0_r8 - fract_spread_grass) * total_to_store_tan
+                
+                flux_grass_spread = flux_grass_spread + fract_spread_grass * total_to_store*col%wtgcell(c)
+                flux_grass_spread_tan = flux_grass_spread_tan + fract_spread_grass * total_to_store_tan*col%wtgcell(c)
                 man_n_transf(c) = man_n_transf(c) + total_to_store
 
                 nh3_flux_stores(c) = sum(fluxes_nitr(iflx_air_stores,:))
@@ -1052,6 +1055,7 @@ contains
   !-----------------------------------------------------------------------
   subroutine CNNFert(bounds, num_soilc, filter_soilc, &
        cnveg_nitrogenflux_inst, soilbiogeochem_nitrogenflux_inst)
+
     !
     ! !DESCRIPTION:
     ! On the radiation time step, update the nitrogen fertilizer for crops
@@ -1070,17 +1074,31 @@ contains
     integer :: c,fc                 ! indices
     !-----------------------------------------------------------------------
 
-    associate(                                                                  &   
-         fert          =>    cnveg_nitrogenflux_inst%fert_patch ,               & ! Input:  [real(r8) (:)]  nitrogen fertilizer rate (gN/m2/s)                
-         fert_to_sminn =>    soilbiogeochem_nitrogenflux_inst%fert_to_sminn_col & ! Output: [real(r8) (:)]                                                    
-         )
-      
-      call p2c(bounds, num_soilc, filter_soilc, &
-           fert(bounds%begp:bounds%endp), &
-           fert_to_sminn(bounds%begc:bounds%endc))
-
-    end associate
-
+    if (use_fan .and. fan_to_bgc) then
+       associate(                                                                     &   
+            fert_to_sminn =>    soilbiogeochem_nitrogenflux_inst%fert_to_sminn_col,    & ! Output: [real(r8) (:)]                                                    
+            ! Input: FAN output fluxes, gN/m2/s
+            fert_nh4_to_soil => soilbiogeochem_nitrogenflux_inst%fert_nh4_to_soil_col, & ! 
+            manure_nh4_to_soil => soilbiogeochem_nitrogenflux_inst%manure_nh4_to_soil_col, & 
+            fert_no3_prod => soilbiogeochem_nitrogenflux_inst%fert_no3_prod_col,       & ! 
+            manure_no3_prod => soilbiogeochem_nitrogenflux_inst%manure_no3_prod_col   & ! 
+            )
+         do fc = 1, num_soilc
+            c = filter_soilc(fc)
+            fert_to_sminn(c) = fert_nh4_to_soil(c) + fert_no3_prod(c) + manure_nh4_to_soil(c) + manure_no3_prod(c)
+         end do
+       end associate
+    else
+       associate(                                                                     &   
+            fert          =>    cnveg_nitrogenflux_inst%fert_patch ,                  & ! Input:  [real(r8) (:)]  nitrogen fertilizer rate (gN/m2/s)                
+            fert_to_sminn =>    soilbiogeochem_nitrogenflux_inst%fert_to_sminn_col    & ! Output: [real(r8) (:)]                                                    
+            )
+         call p2c(bounds, num_soilc, filter_soilc, &
+              fert(bounds%begp:bounds%endp), &
+              fert_to_sminn(bounds%begc:bounds%endc))
+       end associate
+    end if
+    
   end subroutine CNNFert
 
   !-----------------------------------------------------------------------

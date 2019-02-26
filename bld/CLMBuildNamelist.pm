@@ -2872,6 +2872,10 @@ sub setup_logic_fan {
        add_default($opts, $nl_flags->{'inputdata_rootdir'}, $definition, $defaults, $nl, 'use_fan',
 		   'use_cn'=>$nl_flags->{'use_cn'}, 'use_ed'=>$nl_flags->{'use_ed'} );
        $nl_flags->{'use_fan'} = $nl->get_value('use_fan');
+       add_default($opts, $nl_flags->{'inputdata_rootdir'}, $definition, $defaults, $nl, 'fan_to_bgc',
+		   'use_cn'=>$nl_flags->{'use_cn'}, 'use_ed'=>$nl_flags->{'use_ed'} );
+       $nl_flags->{'fan_to_bgc'} = $nl->get_value('fan_to_bgc');
+       
        add_default($opts, $nl_flags->{'inputdata_rootdir'}, $definition, $defaults, $nl, 'fan_nh3_to_atm',
 		   'fan_mode'=>$opts->{'fan'});
        $nl_flags->{'fan_nh3_to_atm'} = $nl->get_value('fan_nh3_to_atm');

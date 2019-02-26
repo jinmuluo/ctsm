@@ -673,6 +673,11 @@ Toggle to turn on the plant hydraulic stress model
 Toggle to turn on the Flow of Agricultural Nitrogen (FAN) model
 </entry>
 
+<entry id="fan_to_bgc" type="logical" category="physics"
+        group="clm_inparm" valid_values="" value=".false.">
+Toggle to couple the Flow of Agricultural Nitrogen (FAN) model to CLM soil nitrogen pools
+</entry>
+
 <entry id="lnc_opt" type="logical" category="clm_nitrogen"
        group="clm_nitrogen" value=".false.">
 How LUNA and Photosynthesis (if needed) will get Leaf nitrogen content

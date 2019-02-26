@@ -269,6 +269,8 @@ module clm_varctl
   !----------------------------------------------------------
 
   logical, public :: use_fan = .false. ! true => use FAN model
+  logical, public :: fan_to_bgc = .false. ! true => allow FAN to affect soil biogeochemistry
+  
 !KO
 
   !----------------------------------------------------------

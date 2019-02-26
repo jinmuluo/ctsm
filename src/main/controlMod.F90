@@ -242,7 +242,7 @@ contains
     namelist /clm_inparm/ use_hydrstress
 
 !KO
-    namelist /clm_inparm/ use_fan
+    namelist /clm_inparm/ use_fan, fan_to_bgc
 !KO
 
     namelist /clm_inparm/ use_dynroot
@@ -693,6 +693,7 @@ contains
 
 !KO
     call mpi_bcast (use_fan, 1, MPI_LOGICAL, 0, mpicom, ier)
+    call mpi_bcast (fan_to_bgc, 1, MPI_LOGICAL, 0, mpicom, ier)
 !KO
 
     call mpi_bcast (use_dynroot, 1, MPI_LOGICAL, 0, mpicom, ier)
