@@ -383,7 +383,8 @@ contains
        theta = min(theta, 0.98_r8*thetasat)
        infiltr_m_s = max(waterflux_inst%qflx_infl_col(c), 0.0) * 1e-3 
        evap_m_s = waterflux_inst%qflx_evap_grnd_col(c) * 1e-3
-       runoff_m_s = max(waterflux_inst%qflx_runoff_col(c), 0.0) * 1e-3
+       runoff_m_s = max(waterflux_inst%qflx_surf_col(c), 0.0) * 1e-3
+       if (runoff_m_s > 1.0_r8) runoff_m_s = 0.0_r8
        soilpsi = soilstate_inst%soilpsi_col(c,1)
 
        !
