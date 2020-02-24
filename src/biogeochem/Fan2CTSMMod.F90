@@ -353,8 +353,7 @@ contains
        c = filter_soilc(fc)
        l = col%landunit(c)
        g = col%gridcell(c)
-       if (.not. (lun%itype(l) == istsoil .or. lun%itype(l) == istcrop)) cycle
-       if (.not. col%active(c) .or. col%wtgcell(c) < 1e-15) cycle
+       if (.not. col%active(c)) cycle
 
        ! Find and average the atmospheric resistances Rb and Ra.
        ! 
@@ -775,6 +774,10 @@ contains
     ! FAN allows a fraction of manure N diverted before storage; this optionis currently
     ! not used.
     real(r8), parameter :: fract_direct = 0.0_r8
+    ! Below we need to find "the column that contains grass". This array specifes the
+    ! (arbitrary) order for searching different pfts so that the search return the same
+    ! column regardless of how the columns are ordered.
+    integer, parameter :: grass_pref_order(3) = (/nc4_grass, nc3_nonarctic_grass, nc3_arctic_grass/)
     
     ! N fluxes, gN/m2/sec:
     !
@@ -797,12 +800,13 @@ contains
     ! N fluxes evaluated by eval_fluxes_storage. Indices are in FanMode.F90. Dimensions
     ! are (type of flux, ruminant/other).
     real(r8) :: fluxes_nitr(num_fluxes,2), fluxes_tan(num_fluxes,2) 
-
+    
     ! Auxiliary and index variables:
     logical :: is_grass
-    integer :: begg, endg, g, l, c, il, counter, col_grass, status, p, fc
+    integer :: begg, endg, g, l, c, il, counter, col_grass, status, p, fc, pft_search
     real(r8) :: cumflux, totalinput 
 
+    
     begg = bounds%begg; endg = bounds%endg
 
     associate(&
@@ -814,7 +818,8 @@ contains
     cumflux = 0.0
 
     do fc = 1, num_soilc
-       ! Zero the manure N spread arrays because the nat veg columns receive N additively (see below)
+       ! Zero the manure N spread arrays because the nat veg columns receive N additively
+       ! (see below)
        c = filter_soilc(fc)
        tan_manure_spread_col(c) = 0.0_r8
        n_manure_spread_col(c) = 0.0_r8
@@ -826,11 +831,14 @@ contains
        ! grasslands are always found in the natural vegetation column.
        col_grass = ispval
        l = grc%landunit_indices(istsoil, g)
-       do c = lun%coli(l), lun%colf(l)
-          if (col%itype(c) == istsoil) then
-             col_grass = c
-             exit
-          end if
+       do pft_search = 1, size(grass_pref_order)
+          do p = lun%patchi(l), lun%patchf(l)
+             if (patch%itype(p) == grass_pref_order(pft_search)) then
+                col_grass = path%column(p)
+                exit
+             end if
+          end do
+          if (col_grass /= ispval) exit
        end do
        if (col_grass == ispval) then
           call endrun(msg='Failed to find net veg column')
@@ -849,8 +857,11 @@ contains
 
              if (crop_man_is4crop_area) then
                 invscale = 1.0_r8
-             else
+             else if (lun%wtgcell(l) > 0) then
                 invscale = 1.0_r8 / lun%wtgcell(l)
+             else
+                !  This will input zero manure to the zero-weight land unit.
+                invscale = 0.0_r8
              end if
 
              n_manure_mixed_col(c) = (ndep_ngrz_grc(g) + ndep_sgrz_grc(g)) * kg_to_g * invscale
@@ -934,7 +945,7 @@ contains
           end do ! column
        end if ! land unit not ispval
 
-       if (col_grass /= ispval) then
+       if (col_grass /= ispval .and. col%wtgcell(col_grass) > 0) then
           n_manure_spread_col(col_grass) = n_manure_spread_col(col_grass) &
                + flux_grass_spread / col%wtgcell(col_grass)
           tan_manure_spread_col(col_grass) = tan_manure_spread_col(col_grass) &
@@ -946,8 +957,10 @@ contains
                   flux_grass_spread_tan, col_grass, tan_manure_spread_col(col_grass)
           end if
        else if (flux_grass_spread > 0) then
-          ! There was no column that had a grass pft:
+          ! There was no column that had a nonzero grass pft:
           write(iulog, *) 'Warning (FAN): fract_spread_grass > 0 not possible in this cell:', g
+          ! This indicates that the landuse is not consistent with the idea of nonzero
+          ! fract_spread_grass, so it might be better to set it to zero.
        end if
 
     end do ! grid
