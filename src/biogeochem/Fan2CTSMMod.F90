@@ -777,7 +777,7 @@ contains
     ! Below we need to find "the column that contains grass". This array specifes the
     ! (arbitrary) order for searching different pfts so that the search return the same
     ! column regardless of how the columns are ordered.
-    integer, parameter :: grass_pref_order(3) = (/nc4_grass, nc3_nonarctic_grass, nc3_arctic_grass/)
+    integer :: grass_pref_order(3)
     
     ! N fluxes, gN/m2/sec:
     !
@@ -806,9 +806,10 @@ contains
     integer :: begg, endg, g, l, c, il, counter, col_grass, status, p, fc, pft_search
     real(r8) :: cumflux, totalinput 
 
+    grass_pref_order(1:3) = (/nc4_grass, nc3_nonarctic_grass, nc3_arctic_grass/)
     
     begg = bounds%begg; endg = bounds%endg
-
+    
     associate(&
       t_ref2m => temperature_inst%t_ref2m_patch, & ! 2m temperature, K
       u10 => frictionvel_inst%u10_patch, & ! 10m wind speed, m/s
@@ -834,7 +835,7 @@ contains
        do pft_search = 1, size(grass_pref_order)
           do p = lun%patchi(l), lun%patchf(l)
              if (patch%itype(p) == grass_pref_order(pft_search)) then
-                col_grass = path%column(p)
+                col_grass = patch%column(p)
                 exit
              end if
           end do
