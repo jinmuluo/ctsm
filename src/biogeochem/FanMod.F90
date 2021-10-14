@@ -527,7 +527,7 @@ contains
     real(r8) :: fract_slurry_soil, flux_to_soilpools
     
     fract_slurry_soil = water_slurry(2) / sum(water_slurry)
-    flux_to_soilpools = tan_slurry * fract_slurry_soil / pools(1)
+    flux_to_soilpools = tan_slurry * 1.0 / pools(1)
     tan_slurry = tan_slurry + (ndep - flux_to_soilpools) * dt
 
     call age_pools_soil(flux_to_soilpools, dt, pools(2:), tan_soil, garbage)

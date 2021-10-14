@@ -84,7 +84,7 @@ module Fan2CTSMMod
   real(r8), parameter :: depth_slurry = 0.005_r8   ! slurry application rate (m)
   real(r8), parameter :: water_init_fert = 1e-9_r8   ! water in fertilizer (assumed very little).
   ! Slurry infiltration time
-  real(r8), parameter :: slurry_infiltr_time = 6.0_r8*3600_r8 ! seconds
+  real(r8), parameter :: slurry_infiltr_time = 12.0_r8*3600_r8 ! seconds
   ! Reduction factor for fertilizer due to mechanical incorporation.
   ! N available for volatilization becomes multiplied by (1-fert_incorp_reduct).
   real(r8) :: fert_incorp_reduct = 0.25_r8
