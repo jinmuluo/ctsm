@@ -8,14 +8,18 @@ module SoilBiogeochemNStateUpdate1Mod
   use shr_kind_mod                       , only: r8 => shr_kind_r8
   use clm_time_manager                   , only : get_step_size_real
   use clm_varpar                         , only : nlevdecomp, ndecomp_cascade_transitions
-  use clm_varctl                         , only : iulog, use_nitrif_denitrif, use_crop
-  use clm_varcon                         , only : nitrif_n2o_loss_frac
+  use clm_varctl                         , only : iulog, use_nitrif_denitrif
+  use clm_varctl                         , only : use_crop, use_fan
+  use clm_varcon                         , only : nitrif_n2o_loss_frac, dzsoi_decomp
   use SoilBiogeochemStateType            , only : soilbiogeochem_state_type
   use SoilBiogeochemNitrogenStateType    , only : soilbiogeochem_nitrogenstate_type
   use SoilBiogeochemNitrogenfluxType     , only : soilbiogeochem_nitrogenflux_type
   use SoilBiogeochemDecompCascadeConType , only : decomp_cascade_con, use_soil_matrixcn
   use CNSharedParamsMod                  , only : use_fun
   use ColumnType                         , only : col 
+  use abortutils                         , only : endrun
+  use Fan3Mod                            , only : use_canopy_reduction,  nitrif_n2o_loss_frac_parton
+  use Fan3Mod                            , only : use_upward_diffusion
   !
   implicit none
   private
@@ -45,6 +49,8 @@ contains
     integer :: c,p,j,l,k ! indices
     integer :: fc        ! lake filter indices
     real(r8):: dt        ! radiation time step (seconds)
+    real(r8):: nh4_totn_term
+    real(r8):: profile_term(nlevdecomp)
 
     !-----------------------------------------------------------------------
 
@@ -100,23 +106,56 @@ contains
 
                   ! N deposition and fixation
                   ns%sminn_vr_col(c,j) = ns%sminn_vr_col(c,j) &
-                       + nf%fert_to_sminn_col(c)*dt * ndep_prof(c,j)
+                       + nf%fert_to_sminn_col(c)*dt * ndep_prof(c,j) 
+                  if (use_fan) then
+                     ns%sminn_vr_col(c,j) = ns%sminn_vr_col(c,j) &
+                     + nf%nitrate_n_to_sminn_col(c)*dt * ndep_prof(c,j)
+                  end if 
                   ns%sminn_vr_col(c,j) = ns%sminn_vr_col(c,j) &
                        + nf%soyfixn_to_sminn_col(c)*dt * nfixation_prof(c,j)
-
                else
 
-                  ! N deposition and fixation (put all into NH4 pool)
+                  ! N deposition and fixation 
                   ns%smin_nh4_vr_col(c,j) = ns%smin_nh4_vr_col(c,j) &
                        + nf%fert_to_sminn_col(c)*dt * ndep_prof(c,j)
+                  if (use_fan) then
+                      ns%smin_no3_vr_col(c,j) = ns%smin_no3_vr_col(c,j) &
+                      + nf%nitrate_n_to_sminn_col(c)*dt * ndep_prof(c,j)
+                  end if 
                   ns%smin_nh4_vr_col(c,j) = ns%smin_nh4_vr_col(c,j) &
                        + nf%soyfixn_to_sminn_col(c)*dt * nfixation_prof(c,j)
-
                end if
             end do
          end do
       end if
 
+      ! Upward of NH4+ diffusion to FAN!! 
+      if (use_fan .and. use_nitrif_denitrif .and. use_upward_diffusion) then
+         do fc = 1, num_soilc
+            c = filter_soilc(fc)
+            ! nh4 vertial pool is in gN/m3 per layer -> gN/m2 column
+             nh4_totn_term = 0.0_r8
+             do j =1, nlevdecomp
+                nh4_totn_term = nh4_totn_term + ns%smin_nh4_vr_col(c, j) * dzsoi_decomp(j)
+             end do
+             profile_term = ns%smin_nh4_vr_col(c, 1:)/nh4_totn_term
+
+             nh4_totn_term = nh4_totn_term - nf%nh4_upward_diffusion_col(c)*dt
+            
+             if (nh4_totn_term < 0.0_r8) then 
+                 write(iulog,*) 'c:', c
+                 write(iulog,*) 'total column pools before', nh4_totn_term + nf%nh4_upward_diffusion_col(c)*dt
+                 write(iulog,*) 'total column pools after:', nh4_totn_term  
+                 write(iulog,*) 'diffusion, dt:', nf%nh4_upward_diffusion_col(c), dt
+                 call endrun('Stop from (NStateUpdate mod) : upward diffusion > pools !!')
+             else
+                 do j = 1, nlevdecomp
+                    ns%smin_nh4_vr_col(c,j) = nh4_totn_term *profile_term(j) 
+                 end do
+             end if
+         end do
+      end if
+      
       ! decomposition fluxes
       if (.not. use_soil_matrixcn) then
          do k = 1, ndecomp_cascade_transitions
@@ -249,14 +288,18 @@ contains
                ns%smin_nh4_vr_col(c,j) = ns%smin_nh4_vr_col(c,j) - nf%f_nit_vr_col(c,j) * dt
 
                ns%smin_no3_vr_col(c,j) = ns%smin_no3_vr_col(c,j) + nf%f_nit_vr_col(c,j) * dt &
-                    * (1._r8 - nitrif_n2o_loss_frac)
+                    * ( 1._r8 - nitrif_n2o_loss_frac_parton * (1 + nf%ratio_nox_n2o_col(c,j)) )
 
                ! Account for denitrification fluxes
                ns%smin_no3_vr_col(c,j) = ns%smin_no3_vr_col(c,j) - nf%f_denit_vr_col(c,j) * dt
 
                ! flux that prevents N limitation (when Carbon_only is set; put all into NH4)
                ns%smin_nh4_vr_col(c,j) = ns%smin_nh4_vr_col(c,j) + nf%supplement_to_sminn_vr_col(c,j)*dt
-
+               
+               ! NOx captured by canopy is sent back to NH4+ pool
+               if (use_fan .and. use_canopy_reduction) then
+                  ns%smin_nh4_vr_col(c,j) = ns%smin_nh4_vr_col(c,j) + nf%f_canopy_to_soil_vr_col(c,j) * dt
+               end if 
                ! update diagnostic total
                ns%sminn_vr_col(c,j) = ns%smin_nh4_vr_col(c,j) + ns%smin_no3_vr_col(c,j)
                

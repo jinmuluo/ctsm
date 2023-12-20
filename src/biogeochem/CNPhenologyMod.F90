@@ -313,6 +313,8 @@ contains
     ! !USES:
     use clm_time_manager , only: is_first_step
     use CNSharedParamsMod, only: use_fun
+    use clm_varctl       , only: use_fan
+    use Fan3Mod          , only: eval_cr
     !
     ! !DESCRIPTION:
     ! Dynamic phenology routine for coupled carbon-nitrogen code (CN)
@@ -418,6 +420,12 @@ contains
        call endrun( 'bad phase' )
     end if
 
+    ! Calculate the Canopy reduction coefficient here for fanv3
+    if (use_fan) then
+       call eval_cr(bounds, filter_soilc, num_soilc, canopystate_inst%tlai_patch, &
+            soilbiogeochem_nitrogenstate_inst%CR_col)
+    end if
+ 
   end subroutine CNPhenology
 
   !-----------------------------------------------------------------------

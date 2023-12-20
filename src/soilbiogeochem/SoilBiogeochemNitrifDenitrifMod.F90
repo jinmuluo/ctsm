@@ -13,10 +13,11 @@ module SoilBiogeochemNitrifDenitrifMod
   use clm_varcon                      , only : rpi, grav
   use clm_varcon                      , only : d_con_g, d_con_w, secspday
   use clm_varctl                      , only : use_lch4, use_fates
+  use clm_varctl                      , only : use_fan, iulog
   use abortutils                      , only : endrun
   use decompMod                       , only : bounds_type
   use SoilStatetype                   , only : soilstate_type
-  use WaterStateBulkType                  , only : waterstatebulk_type
+  use WaterStateBulkType              , only : waterstatebulk_type
   use TemperatureType                 , only : temperature_type
   use SoilBiogeochemCarbonFluxType    , only : soilbiogeochem_carbonflux_type
   use SoilBiogeochemNitrogenStateType , only : soilbiogeochem_nitrogenstate_type
@@ -157,7 +158,7 @@ contains
     type(temperature_type)                  , intent(in)    :: temperature_inst
     type(ch4_type)                          , intent(in)    :: ch4_inst
     type(soilbiogeochem_carbonflux_type)    , intent(in)    :: soilbiogeochem_carbonflux_inst
-    type(soilbiogeochem_nitrogenstate_type) , intent(in)    :: soilbiogeochem_nitrogenstate_inst
+    type(soilbiogeochem_nitrogenstate_type) , intent(inout) :: soilbiogeochem_nitrogenstate_inst
     type(soilbiogeochem_nitrogenflux_type)  , intent(inout) :: soilbiogeochem_nitrogenflux_inst
     !
     ! !LOCAL VARIABLES:
@@ -168,6 +169,7 @@ contains
     real(r8) :: mu, sigma
     real(r8) :: t
     real(r8) :: pH(bounds%begc:bounds%endc)
+    real(r8) :: h2osoi_vol_min(bounds%begc:bounds%endc,1:nlevdecomp)     ! h2osoi_vol restricted to be <= watsat
     !debug-- put these type structure for outing to hist files
     real(r8) :: co2diff_con(2)                      ! diffusion constants for CO2
     real(r8) :: eps
@@ -241,8 +243,9 @@ contains
          pot_f_nit_vr                  =>    soilbiogeochem_nitrogenflux_inst%pot_f_nit_vr_col                  , & ! Output:  [real(r8) (:,:) ]  (gN/m3/s) potential soil nitrification flux     
 
          pot_f_denit_vr                =>    soilbiogeochem_nitrogenflux_inst%pot_f_denit_vr_col                , & ! Output:  [real(r8) (:,:) ]  (gN/m3/s) potential soil denitrification flux   
-         n2_n2o_ratio_denit_vr         =>    soilbiogeochem_nitrogenflux_inst%n2_n2o_ratio_denit_vr_col           & ! Output:  [real(r8) (:,:) ]  ratio of N2 to N2O production by denitrification [gN/gN]
-         )
+         n2_n2o_ratio_denit_vr         =>    soilbiogeochem_nitrogenflux_inst%n2_n2o_ratio_denit_vr_col         , & ! Output:  [real(r8) (:,:) ]  ratio of N2 to N2O production by denitrification [gN/gN]
+         ratio_nox_n2o                 =>    soilbiogeochem_nitrogenflux_inst%ratio_nox_n2o_col                   &
+         )           
 
       surface_tension_water = params_inst%surface_tension_water
 
@@ -266,8 +269,9 @@ contains
             !---------------- calculate soil anoxia state
             ! calculate gas diffusivity of soil at field capacity here
             ! use expression from methane code, but neglect OM for now
-            f_a = 1._r8 - watfc(c,j) / watsat(c,j)
-            eps =  watsat(c,j)-watfc(c,j) ! Air-filled fraction of total soil volume
+            h2osoi_vol_min(c,j) = min(watsat(c,j), h2osoi_vol(c,j))
+            f_a = 1._r8 - h2osoi_vol_min(c,j) / watsat(c,j)
+            eps = watsat(c,j) - h2osoi_vol_min(c,j) ! Air-filled fraction of total soil volume
 
             ! use diffusivity calculation including peat
             if (use_lch4) then
@@ -278,10 +282,14 @@ contains
                else
                   om_frac = 1._r8
                end if
-               diffus (c,j) = (d_con_g(2,1) + d_con_g(2,2)*t_soisno(c,j)) * 1.e-4_r8 * &
-                    (om_frac * f_a**(10._r8/3._r8) / watsat(c,j)**2 + &
-                    (1._r8-om_frac) * eps**2 * f_a**(3._r8 / bsw(c,j)) ) 
-
+               !diffus(c,j) = (d_con_g(2,1) + d_con_g(2,2)*t_soisno(c,j)) * 1.e-4_r8 * &
+               !     (om_frac * f_a**(10._r8/3._r8) / watsat(c,j)**2 + &
+               !     (1._r8-om_frac) * eps**2 * f_a**(3._r8 / bsw(c,j)) )
+               
+               ! Use our new way to calculate the normalized diffusivity 
+               diffus(c,j) = om_frac * eps**(10._r8/3._r8) / watsat(c,j)**2 + &
+                            (1._r8-om_frac) * eps**2 * f_a**(3._r8 / bsw(c,j))
+               
                ! calculate anoxic fraction of soils
                ! use rijtema and kroess model after Riley et al., 2000
                ! caclulated r_psi as a function of psi
@@ -304,7 +312,7 @@ contains
                ! NITRIF_DENITRIF requires Methane model to be active, 
                ! otherwise diffusivity will be zeroed out here. EBK CDK 10/18/2011
                anaerobic_frac(c,j) = 0._r8
-               diffus (c,j) = 0._r8
+               diffus(c,j) = 0._r8
                !call endrun(msg=' ERROR: NITRIF_DENITRIF requires Methane model to be active'//errMsg(sourcefile, __LINE__) )
             end if
 
@@ -332,6 +340,9 @@ contains
             ! limit to oxic fraction of soils
             pot_f_nit_vr(c,j)  = pot_f_nit_vr(c,j) * (1._r8 - anaerobic_frac(c,j))
 
+            ! emission rate of nox and n2o 
+            ratio_nox_n2o(c,j) = max(0.0_r8, 15.2_r8+35.5_r8*atan(0.68_r8*rpi*(10.0_r8*diffus(c,j) - 1.86_r8))/rpi) 
+ 
             ! limit to non-frozen soil layers
             if ( t_soisno(c,j) <= SHR_CONST_TKFRZ .and. no_frozen_nitrif_denitrif) then
                pot_f_nit_vr(c,j) = 0._r8
@@ -390,12 +401,29 @@ contains
 
             ! final ratio expression 
             n2_n2o_ratio_denit_vr(c,j) = max(0.16_r8*ratio_k1(c,j), ratio_k1(c,j)*exp(-0.8_r8 * ratio_no3_co2(c,j))) * fr_WFPS(c,j)
-
+         
          end do
 
       end do
 
     end associate
+
+
+    ! fetch some values for fanv3
+    if (use_fan) then
+       soilbiogeochem_nitrogenstate_inst%S_fmax_denit_carbonsubstrate_vr_col(bounds%begc:bounds%endc, 1:nlevdecomp) = &
+       soilbiogeochem_nitrogenflux_inst%fmax_denit_carbonsubstrate_vr_col(bounds%begc:bounds%endc, 1:nlevdecomp)
+
+       soilbiogeochem_nitrogenstate_inst%S_anaerobic_frac_col(bounds%begc:bounds%endc, 1:nlevdecomp) = & 
+       soilbiogeochem_nitrogenflux_inst%anaerobic_frac_col(bounds%begc:bounds%endc, 1:nlevdecomp)
+
+       soilbiogeochem_nitrogenstate_inst%S_diffus_col(bounds%begc:bounds%endc, 1:nlevdecomp) = & 
+       soilbiogeochem_nitrogenflux_inst%diffus_col(bounds%begc:bounds%endc, 1:nlevdecomp)
+
+       soilbiogeochem_nitrogenstate_inst%S_soil_co2_prod_col(bounds%begc:bounds%endc, 1:nlevdecomp)  = &
+       soilbiogeochem_nitrogenflux_inst%soil_co2_prod_col(bounds%begc:bounds%endc, 1:nlevdecomp)
+    end if
+
 
   end subroutine SoilBiogeochemNitrifDenitrif
 

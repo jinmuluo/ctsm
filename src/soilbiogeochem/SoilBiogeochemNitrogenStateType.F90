@@ -71,6 +71,30 @@ module SoilBiogeochemNitrogenStateType
 
      real(r8), pointer :: fan_totn_col(:)                      ! col (gN/m2) total N in FAN pools
      
+     real(r8), pointer :: nitrate_g1_col(:)                    ! col (gN/m2) total Nitrate N in FAN pool G1
+     real(r8), pointer :: nitrate_g2_col(:)                    ! col (gN/m2) total Nitrate N in FAN pool G2
+     real(r8), pointer :: nitrate_g3_col(:)                    ! col (gN/m2) total Nitrate N in FAN pool G2
+
+     real(r8), pointer :: nitrate_s0_col(:)                    ! col (gN/m2) total Nitrate N in FAN pool S0
+     real(r8), pointer :: nitrate_s1_col(:)                    ! col (gN/m2) total Nitrate N in FAN pool S1
+     real(r8), pointer :: nitrate_s2_col(:)                    ! col (gN/m2) total Nitrate N in FAN pool S2
+     real(r8), pointer :: nitrate_s3_col(:)                    ! col (gN/m2) total Nitrate N in FAN pool S2
+
+     real(r8), pointer :: nitrate_f1_col(:)                    ! col (gN/m2) total Nitrate N in FAN pool F1
+     real(r8), pointer :: nitrate_f2_col(:)                    ! col (gN/m2) total Nitrate N in FAN pool F2
+     real(r8), pointer :: nitrate_f3_col(:)                    ! col (gN/m2) total Nitrate N in FAN pool F3
+     real(r8), pointer :: nitrate_f4_col(:)                    ! col (gN/m2) total Nitrate N in FAN pool F4
+    
+     real(r8), pointer :: nitrate_totn_col(:)                  ! col (gN/m2) total Nitrate N in FAN pools
+     real(r8), pointer :: CR_col(:)                            ! Canopy reduction coefficient, unitless 
+
+     ! TEMPORARY STATE FOR FANv3   
+     real(r8), pointer :: S_fmax_denit_carbonsubstrate_vr_col(:,:)
+     real(r8), pointer :: S_anaerobic_frac_col(:,:)
+     real(r8), pointer :: S_diffus_col(:,:)                      ! col diffusivity (m2/s)
+     real(r8), pointer :: S_soil_co2_prod_col(:,:)
+
+
      ! summary (diagnostic) state variables, not involved in mass balance
      real(r8), pointer :: decomp_npools_col            (:,:)   ! col (gN/m2)  decomposing (litter, cwd, soil) N pools
      real(r8), pointer :: decomp_npools_1m_col         (:,:)   ! col (gN/m2)  diagnostic: decomposing (litter, cwd, soil) N pools to 1 meter
@@ -199,10 +223,33 @@ contains
        allocate(this%manure_r_app_col(begc:endc)) ; this%manure_r_app_col(:) = nan
 
        allocate(this%fan_grz_fract_col(begc:endc)) ; this%fan_grz_fract_col(:) = nan
+       
+       allocate(this%nitrate_g1_col(begc:endc)) ; this%nitrate_g1_col(:) = nan
+       allocate(this%nitrate_g2_col(begc:endc)) ; this%nitrate_g2_col(:) = nan 
+       allocate(this%nitrate_g3_col(begc:endc)) ; this%nitrate_g3_col(:) = nan
+       allocate(this%nitrate_s0_col(begc:endc)) ; this%nitrate_s0_col(:) = nan
+       allocate(this%nitrate_s1_col(begc:endc)) ; this%nitrate_s1_col(:) = nan
+       allocate(this%nitrate_s2_col(begc:endc)) ; this%nitrate_s2_col(:) = nan
+       allocate(this%nitrate_s3_col(begc:endc)) ; this%nitrate_s3_col(:) = nan
+       allocate(this%nitrate_f1_col(begc:endc)) ; this%nitrate_f1_col(:) = nan
+       allocate(this%nitrate_f2_col(begc:endc)) ; this%nitrate_f2_col(:) = nan
+       allocate(this%nitrate_f3_col(begc:endc)) ; this%nitrate_f3_col(:) = nan
+       allocate(this%nitrate_f4_col(begc:endc)) ; this%nitrate_f4_col(:) = nan
+       allocate(this%CR_col(begc:endc)) ; this%CR_col(:) = nan
+      
+       allocate(this%S_fmax_denit_carbonsubstrate_vr_col(begc:endc,1:nlevdecomp_full)) ;
+                this%S_fmax_denit_carbonsubstrate_vr_col(:,:) = nan
+       allocate(this%S_anaerobic_frac_col(begc:endc,1:nlevdecomp_full)) ; 
+                this%S_anaerobic_frac_col(:,:) = spval
+       allocate(this%S_diffus_col(begc:endc,1:nlevdecomp_full)) ; 
+                this%S_diffus_col(:,:) = spval
+       allocate(this%S_soil_co2_prod_col(begc:endc,1:nlevdecomp_full)) ; 
+                this%S_soil_co2_prod_col(:,:) = nan
 
     end if
     ! Always allocate FAN total N, stays 0 if FAN is inactive.
     allocate(this%fan_totn_col(begc:endc)) ; this%fan_totn_col(:) = nan
+    allocate(this%nitrate_totn_col(begc:endc)) ; this%nitrate_totn_col(:) = nan
 
   end subroutine InitAllocate
 
@@ -477,6 +524,86 @@ contains
        call hist_addfld1d (fname='FAN_GRZ_FRACT', units='', &
             avgflag='A', long_name='Fraction of animals grazing', &
             ptr_col=this%fan_grz_fract_col)
+      
+       this%nitrate_g1_col(begc:endc) = spval
+       call hist_addfld1d (fname='NITRATE_G1', units='gN/m2', &
+            avgflag='A', long_name='total Nitrate N in FAN pool G1', &
+            ptr_col=this%nitrate_g1_col, default=fanpools_default)
+
+       this%nitrate_g2_col(begc:endc) = spval
+       call hist_addfld1d (fname='NITRATE_G2', units='gN/m2', &
+            avgflag='A', long_name='total Nitrate N in FAN pool G2', &
+            ptr_col=this%nitrate_g2_col, default=fanpools_default)
+
+       this%nitrate_g3_col(begc:endc) = spval
+       call hist_addfld1d (fname='NITRATE_G3', units='gN/m2', &
+            avgflag='A', long_name='total Nitrate N in FAN pool G3', &
+            ptr_col=this%nitrate_g3_col, default=fanpools_default)
+
+       this%nitrate_s0_col(begc:endc) = spval
+       call hist_addfld1d (fname='NITRATE_S0', units='gN/m2', &
+            avgflag='A', long_name='total Nitrate N in FAN pool S0', &
+            ptr_col=this%nitrate_s0_col, default=fanpools_default)
+
+       this%nitrate_s1_col(begc:endc) = spval
+       call hist_addfld1d (fname='NITRATE_S1', units='gN/m2', &
+            avgflag='A', long_name='total Nitrate N in FAN pool S1', &
+            ptr_col=this%nitrate_s1_col, default=fanpools_default)
+
+       this%nitrate_s2_col(begc:endc) = spval
+       call hist_addfld1d (fname='NITRATE_S2', units='gN/m2', &
+            avgflag='A', long_name='total Nitrate N in FAN pool S2', &
+            ptr_col=this%nitrate_s2_col, default=fanpools_default)
+
+       this%nitrate_s3_col(begc:endc) = spval
+       call hist_addfld1d (fname='NITRATE_S3', units='gN/m2', &
+            avgflag='A', long_name='total Nitrate N in FAN pool S3', &
+            ptr_col=this%nitrate_s3_col, default=fanpools_default)
+
+       this%nitrate_f1_col(begc:endc) = spval
+       call hist_addfld1d (fname='NITRATE_F1', units='gN/m2', &
+            avgflag='A', long_name='total Nitrate N in FAN pool F1', &
+            ptr_col=this%nitrate_f1_col, default=fanpools_default)
+ 
+       this%nitrate_f2_col(begc:endc) = spval
+       call hist_addfld1d (fname='NITRATE_F2', units='gN/m2', &
+            avgflag='A', long_name='total Nitrate N in FAN pool F2', &
+            ptr_col=this%nitrate_f2_col, default=fanpools_default)
+
+       this%nitrate_f3_col(begc:endc) = spval
+       call hist_addfld1d (fname='NITRATE_F3', units='gN/m2', &
+            avgflag='A', long_name='total Nitrate N in FAN pool F3', &
+            ptr_col=this%nitrate_f3_col, default=fanpools_default)
+
+       this%nitrate_f4_col(begc:endc) = spval
+       call hist_addfld1d (fname='NITRATE_F4', units='gN/m2', &
+            avgflag='A', long_name='total Nitrate N in FAN pool F4', &
+            ptr_col=this%nitrate_f4_col, default=fanpools_default) 
+      
+       this%CR_col(begc:endc) = spval
+       call hist_addfld1d( fname='CR', units='unitless', &
+            avgflag='A', long_name='Canopy reduction coefficient', &
+            ptr_col=this%CR_col, default='inactive')
+ 
+       this%S_fmax_denit_carbonsubstrate_vr_col(begc:endc,:) = spval
+       call hist_addfld_decomp (fname='S_FMAX_DENIT_CARBONSUBSTRATE', units='gN/m^3/s', type2d='levdcmp', &
+            avgflag='A', long_name='S_FMAX_DENIT_CARBONSUBSTRATE', &
+            ptr_col=this%S_fmax_denit_carbonsubstrate_vr_col, default='inactive')
+
+       this%S_anaerobic_frac_col(begc:endc,:) = spval
+       call hist_addfld_decomp (fname='S_anaerobic_frac', units='m3/m3', type2d='levdcmp', &
+            avgflag='A', long_name='S_anaerobic_frac', &
+            ptr_col=this%S_anaerobic_frac_col, default='inactive')
+
+       this%S_diffus_col(begc:endc,:) = spval
+       call hist_addfld_decomp (fname='S_diffus', units='m^2/s', type2d='levdcmp', &
+            avgflag='A', long_name='S_diffusivity', &
+            ptr_col=this%S_diffus_col, default='inactive') 
+
+       this%S_soil_co2_prod_col(begc:endc,:) = spval
+       call hist_addfld_decomp (fname='S_soil_co2_prod', units='ugC/gsoil/day', type2d='levdcmp', &
+            avgflag='A', long_name='S_soil_co2_prod', &
+            ptr_col=this%S_soil_co2_prod_col, default='inactive')
 
     end if
 
@@ -485,7 +612,11 @@ contains
     call hist_addfld1d (fname='FAN_TOTN', units='gN/m2', &
          avgflag='A', long_name='FAN total N', &
          ptr_col=this%fan_totn_col, default='inactive')
-    
+   
+    this%nitrate_totn_col(begc:endc) = spval 
+    call hist_addfld1d (fname='NITRATE_TOTN', units='gN/m2', &
+         avgflag='A', long_name='nitrate total N)', &
+         ptr_col=this%nitrate_totn_col, default='inactive') 
     
     if (use_nitrif_denitrif) then
        call hist_addfld1d (fname='DYN_COL_SOIL_ADJUSTMENTS_NO3', units='gN/m^2', &
@@ -615,9 +746,28 @@ contains
              this%manure_r_app_col(c) = 0.0_r8
 
              this%fan_grz_fract_col(c) = 0.0_r8
-             
+            
+             this%nitrate_g1_col(c) = 0.0_r8
+             this%nitrate_g2_col(c) = 0.0_r8
+             this%nitrate_g3_col(c) = 0.0_r8
+             this%nitrate_s0_col(c) = 0.0_r8 
+             this%nitrate_s1_col(c) = 0.0_r8
+             this%nitrate_s2_col(c) = 0.0_r8
+             this%nitrate_s3_col(c) = 0.0_r8
+             this%nitrate_f1_col(c) = 0.0_r8
+             this%nitrate_f2_col(c) = 0.0_r8
+             this%nitrate_f3_col(c) = 0.0_r8
+             this%nitrate_f4_col(c) = 0.0_r8
+             this%CR_col(c) = 0.0_r8
+             do j = 1, nlevdecomp_full
+                this%S_fmax_denit_carbonsubstrate_vr_col(c,j) = 0.0_r8
+                this%S_anaerobic_frac_col(c,j) = 0.0_r8
+                this%S_diffus_col(c,j)         = 0.0_r8
+                this%S_soil_co2_prod_col(c,j)  = 0.0_r8
+             end do
           end if
           this%fan_totn_col(c) = 0.0_r8
+          this%nitrate_totn_col(c) = 0.0_r8
        end if
     end do
 
@@ -800,11 +950,71 @@ contains
                      dim1name='column', long_name='', units='', &
                      interpinic_flag='interp', readvar=readvar, data=this%fan_grz_fract_col)
 
+       call restartvar(ncid=ncid, flag=flag, varname='nitrate_g1', xtype=ncd_double, &
+                     dim1name='column', long_name='', units='', &
+                     interpinic_flag='interp', readvar=readvar, data=this%nitrate_g1_col)
+       call restartvar(ncid=ncid, flag=flag, varname='nitrate_g2', xtype=ncd_double, &
+                     dim1name='column', long_name='', units='', &
+                     interpinic_flag='interp', readvar=readvar, data=this%nitrate_g2_col)
+       call restartvar(ncid=ncid, flag=flag, varname='nitrate_g3', xtype=ncd_double, &
+                     dim1name='column', long_name='', units='', &
+                     interpinic_flag='interp', readvar=readvar, data=this%nitrate_g3_col)
+       call restartvar(ncid=ncid, flag=flag, varname='nitrate_s0', xtype=ncd_double, &
+                     dim1name='column', long_name='', units='', &
+                     interpinic_flag='interp', readvar=readvar, data=this%nitrate_s0_col)
+       call restartvar(ncid=ncid, flag=flag, varname='nitrate_s1', xtype=ncd_double, &
+                     dim1name='column', long_name='', units='', &
+                     interpinic_flag='interp', readvar=readvar, data=this%nitrate_s1_col)
+       call restartvar(ncid=ncid, flag=flag, varname='nitrate_s2', xtype=ncd_double, &
+                     dim1name='column', long_name='', units='', &
+                     interpinic_flag='interp', readvar=readvar, data=this%nitrate_s2_col)
+       call restartvar(ncid=ncid, flag=flag, varname='nitrate_s3', xtype=ncd_double, &
+                     dim1name='column', long_name='', units='', &
+                     interpinic_flag='interp', readvar=readvar, data=this%nitrate_s3_col)
+       call restartvar(ncid=ncid, flag=flag, varname='nitrate_f1', xtype=ncd_double, &
+                     dim1name='column', long_name='', units='', &
+                     interpinic_flag='interp', readvar=readvar, data=this%nitrate_f1_col)
+       call restartvar(ncid=ncid, flag=flag, varname='nitrate_f2', xtype=ncd_double, &
+                     dim1name='column', long_name='', units='', &
+                     interpinic_flag='interp', readvar=readvar, data=this%nitrate_f2_col)
+       call restartvar(ncid=ncid, flag=flag, varname='nitrate_f3', xtype=ncd_double, &
+                     dim1name='column', long_name='', units='', &
+                     interpinic_flag='interp', readvar=readvar, data=this%nitrate_f3_col)
+       call restartvar(ncid=ncid, flag=flag, varname='nitrate_f4', xtype=ncd_double, &
+                     dim1name='column', long_name='', units='', &
+                     interpinic_flag='interp', readvar=readvar, data=this%nitrate_f4_col)
+      
+       call restartvar(ncid=ncid, flag=flag, varname='CR', xtype=ncd_double, &
+                     dim1name='column', long_name='', units='', &
+                     interpinic_flag='interp', readvar=readvar, data=this%CR_col) 
+       call restartvar(ncid=ncid, flag=flag, varname='S_fmax_denit_carbonsubstrate', xtype=ncd_double, &
+                      dim1name='column', dim2name='levgrnd', switchdim=.true., &
+                      long_name='', units='',  scale_by_thickness=.false., &
+                      interpinic_flag='interp', readvar=readvar, data=this%S_fmax_denit_carbonsubstrate_vr_col)
+
+       call restartvar(ncid=ncid, flag=flag, varname='S_anaerobic_frac', xtype=ncd_double, &
+                      dim1name='column', dim2name='levgrnd', switchdim=.true., &
+                      long_name='', units='',  scale_by_thickness=.false., &
+                      interpinic_flag='interp', readvar=readvar, data=this%S_anaerobic_frac_col)
+
+       call restartvar(ncid=ncid, flag=flag, varname='S_diffus', xtype=ncd_double, &
+                      dim1name='column', dim2name='levgrnd', switchdim=.true., &
+                      long_name='', units='',  scale_by_thickness=.false., &
+                      interpinic_flag='interp', readvar=readvar, data=this%S_diffus_col)
+
+       call restartvar(ncid=ncid, flag=flag, varname='S_soil_co2_prod', xtype=ncd_double, &
+                      dim1name='column', dim2name='levgrnd', switchdim=.true., &
+                      long_name='', units='',  scale_by_thickness=.false., &
+                      interpinic_flag='interp', readvar=readvar, data=this%S_soil_co2_prod_col)
+
     end if
     call restartvar(ncid=ncid, flag=flag, varname='fan_totn', xtype=ncd_double, &
          dim1name='column', long_name='', units='', &
          interpinic_flag='interp', readvar=readvar, data=this%fan_totn_col)
 
+    call restartvar(ncid=ncid, flag=flag, varname='nitrate_totn', xtype=ncd_double, &
+         dim1name='column', long_name='', units='', &
+         interpinic_flag='interp', readvar=readvar, data=this%nitrate_totn_col)
 
     if (use_nitrif_denitrif) then
        ! smin_nh4
@@ -993,6 +1203,7 @@ contains
        this%totsomn_1m_col(i)  = value_column
        this%totlitn_1m_col(i)  = value_column
        this%fan_totn_col(i)    = value_column
+       this%nitrate_totn_col(i) = value_column
        if (use_fan) then
           this%tan_g1_col(i)   = value_column
           this%tan_g2_col(i)   = value_column
@@ -1013,6 +1224,24 @@ contains
           this%manure_u_app_col(i) = value_column
           this%manure_a_app_col(i) = value_column
           this%manure_r_app_col(i) = value_column
+          this%nitrate_g1_col(i) = value_column
+          this%nitrate_g2_col(i) = value_column
+          this%nitrate_g3_col(i) = value_column
+          this%nitrate_s0_col(i) = value_column
+          this%nitrate_s1_col(i) = value_column
+          this%nitrate_s2_col(i) = value_column
+          this%nitrate_s3_col(i) = value_column
+          this%nitrate_f1_col(i) = value_column
+          this%nitrate_f2_col(i) = value_column
+          this%nitrate_f3_col(i) = value_column
+          this%nitrate_f4_col(i) = value_column
+          this%CR_col(i) =value_column
+          do j = 1, nlevdecomp_full
+            this%S_fmax_denit_carbonsubstrate_vr_col(i,j) = value_column
+            this%S_anaerobic_frac_col(i,j) = value_column
+            this%S_diffus_col(i,j)         = value_column
+            this%S_soil_co2_prod_col(i,j)  = value_column
+          end do 
        end if
     end do
     
@@ -1288,6 +1517,30 @@ contains
       end do
    end do
 
+   ! fan summary: if we don't update the fan total n here, N balance check would
+   ! use the value from restart file (before land use change update).
+   if (use_fan) then
+      do fc = 1, num_allc
+         c = filter_allc(fc)
+         this%nitrate_totn_col(c)  = this%nitrate_g1_col(c) + this%nitrate_g2_col(c) + &
+                                     this%nitrate_g3_col(c) + this%nitrate_s0_col(c) + & 
+                                     this%nitrate_s1_col(c) + this%nitrate_s2_col(c) + &
+                                     this%nitrate_s3_col(c) + this%nitrate_f1_col(c) + &
+                                     this%nitrate_f2_col(c) + this%nitrate_f3_col(c) + &
+                                     this%nitrate_f4_col(c)
+
+         this%fan_totn_col(c) = this%tan_g1_col(c) + this%tan_g2_col(c) + this%tan_g3_col(c) + &
+                                this%manure_u_grz_col(c) + this%manure_a_grz_col(c) + this%manure_r_grz_col(c) + &
+                                this%tan_s0_col(c) + this%tan_s1_col(c) + this%tan_s2_col(c) + this%tan_s3_col(c) + &
+                                this%manure_u_app_col(c) + this%manure_a_app_col(c) + this%manure_r_app_col(c) + &
+                                this%tan_f1_col(c) + this%tan_f2_col(c) + this%tan_f3_col(c) + this%tan_f4_col(c) + &
+                                this%fert_u1_col(c) + this%fert_u2_col(c)
+
+         ! add the nitrate pools from fanv3 into fan total n pool here
+         this%fan_totn_col(c) = this%fan_totn_col(c) + this%nitrate_totn_col(c)
+      end do
+   end if 
+
  end subroutine Summary
 
  !-----------------------------------------------------------------------
@@ -1384,6 +1637,190 @@ contains
       end do
 
    end if
+  
+   if (use_fan) then
+      ! FAN only has one layer, it follow the same column weight of the first layer in CLM.
+      call column_state_updater%update_column_state_no_special_handling( &
+           bounds = bounds, &
+           clump_index = clump_index, &
+           var = this%tan_g1_col(begc:endc), &
+           adjustment = adjustment_one_level(begc:endc))
+
+      call column_state_updater%update_column_state_no_special_handling( &
+           bounds = bounds, &
+           clump_index = clump_index, &
+           var = this%tan_g2_col(begc:endc), &
+           adjustment = adjustment_one_level(begc:endc))
+
+      call column_state_updater%update_column_state_no_special_handling( &
+           bounds = bounds, &
+           clump_index = clump_index, &
+           var = this%tan_g3_col(begc:endc), &
+           adjustment = adjustment_one_level(begc:endc))
+
+      call column_state_updater%update_column_state_no_special_handling( &
+           bounds = bounds, &
+           clump_index = clump_index, &
+           var = this%tan_s0_col(begc:endc), &
+           adjustment = adjustment_one_level(begc:endc))
+
+      call column_state_updater%update_column_state_no_special_handling( &
+           bounds = bounds, &
+           clump_index = clump_index, &
+           var = this%tan_s1_col(begc:endc), &
+           adjustment = adjustment_one_level(begc:endc))
+
+      call column_state_updater%update_column_state_no_special_handling( &
+           bounds = bounds, &
+           clump_index = clump_index, &
+           var = this%tan_s2_col(begc:endc), &
+           adjustment = adjustment_one_level(begc:endc))
+
+      call column_state_updater%update_column_state_no_special_handling( &
+           bounds = bounds, &
+           clump_index = clump_index, &
+           var = this%tan_s3_col(begc:endc), &
+           adjustment = adjustment_one_level(begc:endc))
+
+      call column_state_updater%update_column_state_no_special_handling( &
+           bounds = bounds, &
+           clump_index = clump_index, &
+           var = this%tan_f1_col(begc:endc), &
+           adjustment = adjustment_one_level(begc:endc))
+
+      call column_state_updater%update_column_state_no_special_handling( &
+           bounds = bounds, &
+           clump_index = clump_index, &
+           var = this%tan_f2_col(begc:endc), &
+           adjustment = adjustment_one_level(begc:endc))
+
+      call column_state_updater%update_column_state_no_special_handling( &
+           bounds = bounds, &
+           clump_index = clump_index, &
+           var = this%tan_f3_col(begc:endc), &
+           adjustment = adjustment_one_level(begc:endc))
+
+      call column_state_updater%update_column_state_no_special_handling( &
+           bounds = bounds, &
+           clump_index = clump_index, &
+           var = this%tan_f4_col(begc:endc), &
+           adjustment = adjustment_one_level(begc:endc))
+
+      call column_state_updater%update_column_state_no_special_handling( &
+           bounds = bounds, &
+           clump_index = clump_index, &
+           var = this%fert_u1_col(begc:endc), &
+           adjustment = adjustment_one_level(begc:endc))      
+
+      call column_state_updater%update_column_state_no_special_handling( &
+           bounds = bounds, &
+           clump_index = clump_index, &
+           var = this%fert_u2_col(begc:endc), &
+           adjustment = adjustment_one_level(begc:endc))
+
+      call column_state_updater%update_column_state_no_special_handling( &
+           bounds = bounds, &
+           clump_index = clump_index, &
+           var = this%manure_u_grz_col(begc:endc), &
+           adjustment = adjustment_one_level(begc:endc))
+
+      call column_state_updater%update_column_state_no_special_handling( &
+           bounds = bounds, &
+           clump_index = clump_index, &
+           var = this%manure_a_grz_col(begc:endc), &
+           adjustment = adjustment_one_level(begc:endc))
+
+      call column_state_updater%update_column_state_no_special_handling( &
+           bounds = bounds, &
+           clump_index = clump_index, &
+           var = this%manure_r_grz_col(begc:endc), &
+           adjustment = adjustment_one_level(begc:endc))
+
+      call column_state_updater%update_column_state_no_special_handling( &
+           bounds = bounds, &
+           clump_index = clump_index, &
+           var = this%manure_u_app_col(begc:endc), &
+           adjustment = adjustment_one_level(begc:endc))
+
+      call column_state_updater%update_column_state_no_special_handling( &
+           bounds = bounds, &
+           clump_index = clump_index, &
+           var = this%manure_a_app_col(begc:endc), &
+           adjustment = adjustment_one_level(begc:endc))
+
+      call column_state_updater%update_column_state_no_special_handling( &
+           bounds = bounds, &
+           clump_index = clump_index, &
+           var = this%manure_r_app_col(begc:endc), &
+           adjustment = adjustment_one_level(begc:endc))
+
+      call column_state_updater%update_column_state_no_special_handling( &
+           bounds = bounds, &
+           clump_index = clump_index, &
+           var = this%nitrate_g1_col(begc:endc), &
+           adjustment = adjustment_one_level(begc:endc))
+
+      call column_state_updater%update_column_state_no_special_handling( &
+           bounds = bounds, &
+           clump_index = clump_index, &
+           var = this%nitrate_g2_col(begc:endc), &
+           adjustment = adjustment_one_level(begc:endc))
+
+      call column_state_updater%update_column_state_no_special_handling( &
+           bounds = bounds, &
+           clump_index = clump_index, &
+           var = this%nitrate_g3_col(begc:endc), &
+           adjustment = adjustment_one_level(begc:endc))
+
+      call column_state_updater%update_column_state_no_special_handling( &
+           bounds = bounds, &
+           clump_index = clump_index, &
+           var = this%nitrate_s0_col(begc:endc), &
+           adjustment = adjustment_one_level(begc:endc))
+
+      call column_state_updater%update_column_state_no_special_handling( &
+           bounds = bounds, &
+           clump_index = clump_index, &
+           var = this%nitrate_s1_col(begc:endc), &
+           adjustment = adjustment_one_level(begc:endc))
+
+      call column_state_updater%update_column_state_no_special_handling( &
+           bounds = bounds, &
+           clump_index = clump_index, &
+           var = this%nitrate_s2_col(begc:endc), &
+           adjustment = adjustment_one_level(begc:endc))
+
+      call column_state_updater%update_column_state_no_special_handling( &
+           bounds = bounds, &
+           clump_index = clump_index, &
+           var = this%nitrate_s3_col(begc:endc), &
+           adjustment = adjustment_one_level(begc:endc))
+
+      call column_state_updater%update_column_state_no_special_handling( &
+           bounds = bounds, &
+           clump_index = clump_index, &
+           var = this%nitrate_f1_col(begc:endc), &
+           adjustment = adjustment_one_level(begc:endc))
+
+      call column_state_updater%update_column_state_no_special_handling( &
+           bounds = bounds, &
+           clump_index = clump_index, &
+           var = this%nitrate_f2_col(begc:endc), &
+           adjustment = adjustment_one_level(begc:endc))
+
+      call column_state_updater%update_column_state_no_special_handling( &
+           bounds = bounds, &
+           clump_index = clump_index, &
+           var = this%nitrate_f3_col(begc:endc), &
+           adjustment = adjustment_one_level(begc:endc))
+
+      call column_state_updater%update_column_state_no_special_handling( &
+           bounds = bounds, &
+           clump_index = clump_index, &
+           var = this%nitrate_f4_col(begc:endc), &
+           adjustment = adjustment_one_level(begc:endc))
+
+   end if 
 
  end subroutine DynamicColumnAdjustments
 

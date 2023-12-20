@@ -455,13 +455,19 @@ contains
          nfix_to_sminn       => soilbiogeochem_nitrogenflux_inst%nfix_to_sminn_col       , & ! Input:  [real(r8) (:) ]  (gN/m2/s) symbiotic/asymbiotic N fixation to soil mineral N 
          ffix_to_sminn       => soilbiogeochem_nitrogenflux_inst%ffix_to_sminn_col       , & ! Input:  [real(r8) (:) ]  (gN/m2/s) free living N fixation to soil mineral N         
          fert_to_sminn       => soilbiogeochem_nitrogenflux_inst%fert_to_sminn_col       , & ! Input:  [real(r8) (:) ]  (gN/m2/s)                                         
+         nitrate_n_to_sminn  => soilbiogeochem_nitrogenflux_inst%nitrate_n_to_sminn_col  , & ! Input;  [real(r8) (:) ]  (gN/m2/s) nitrate diffusion to deep soil from fanv3
          soyfixn_to_sminn    => soilbiogeochem_nitrogenflux_inst%soyfixn_to_sminn_col    , & ! Input:  [real(r8) (:) ]  (gN/m2/s)                                         
          supplement_to_sminn => soilbiogeochem_nitrogenflux_inst%supplement_to_sminn_col , & ! Input:  [real(r8) (:) ]  (gN/m2/s) supplemental N supply                           
          denit               => soilbiogeochem_nitrogenflux_inst%denit_col               , & ! Input:  [real(r8) (:) ]  (gN/m2/s) total rate of denitrification           
          sminn_leached       => soilbiogeochem_nitrogenflux_inst%sminn_leached_col       , & ! Input:  [real(r8) (:) ]  (gN/m2/s) soil mineral N pool loss to leaching   
          smin_no3_leached    => soilbiogeochem_nitrogenflux_inst%smin_no3_leached_col    , & ! Input:  [real(r8) (:) ]  (gN/m2/s) soil mineral NO3 pool loss to leaching 
          smin_no3_runoff     => soilbiogeochem_nitrogenflux_inst%smin_no3_runoff_col     , & ! Input:  [real(r8) (:) ]  (gN/m2/s) soil mineral NO3 pool loss to runoff   
-         f_n2o_nit           => soilbiogeochem_nitrogenflux_inst%f_n2o_nit_col           , & ! Input:  [real(r8) (:) ]  (gN/m2/s) flux of N2o from nitrification 
+         f_n2o_nit           => soilbiogeochem_nitrogenflux_inst%f_n2o_nit_col           , & ! Input:  [real(r8) (:) ]  (gN/m2/s) flux of N2O from nitrification 
+         f_nox_nit           => soilbiogeochem_nitrogenflux_inst%f_nox_nit_col           , & ! Input:  [real(r8) (:) ]  (gN/m2/s) flux of NOx from nitrification
+         f_n2o_denit         => soilbiogeochem_nitrogenflux_inst%f_n2o_denit_col         , & ! Input:  [real(r8) (:) ]  (gN/m2/s) flux of N2O from denitrification 
+         f_nox_denit         => soilbiogeochem_nitrogenflux_inst%f_nox_denit_col         , & ! Input:  [real(r8) (:) ]  (gN/m2/s) flux of NOx from denitrification
+         f_n2_denit          => soilbiogeochem_nitrogenflux_inst%f_n2_denit_col          , & ! Input:  [real(r8) (:) ]  (gN/m2/s) flux of N2 from denitrification 
+         
          som_n_leached       => soilbiogeochem_nitrogenflux_inst%som_n_leached_col       , & ! Input:  [real(r8) (:) ]  (gN/m2/s) total SOM N loss from vertical transport
 
          fan_totnin          => soilbiogeochem_nitrogenflux_inst%fan_totnin_col          , & ! Input:  [real(r8) (:) ]  (gN/m2/s) total N input into the FAN pools
@@ -470,7 +476,7 @@ contains
          col_fire_nloss      => cnveg_nitrogenflux_inst%fire_nloss_col                   , & ! Input:  [real(r8) (:) ]  (gN/m2/s) total column-level fire N loss 
          wood_harvestn       => cnveg_nitrogenflux_inst%wood_harvestn_col                , & ! Input:  [real(r8) (:) ]  (gN/m2/s) wood harvest (to product pools)
          crop_harvestn_to_cropprodn => cnveg_nitrogenflux_inst%crop_harvestn_to_cropprodn_col          , & ! Input:  [real(r8) (:) ]  (gN/m2/s) crop harvest N to 1-year crop product pool
-
+         nh4_diffusion       => soilbiogeochem_nitrogenflux_inst%nh4_upward_diffusion_col              , & ! Output: [real(r8) (:) ]  (gN/m2/s) nh4 upward siffusion from CLM to FAN
          totcoln             => cnveg_nitrogenstate_inst%totn_col                          & ! Input:  [real(r8) (:) ]  (gN/m2) total column nitrogen, incl veg 
          )
 
@@ -498,12 +504,17 @@ contains
          if (use_crop) then
             col_ninputs(c) = col_ninputs(c) + fert_to_sminn(c) + soyfixn_to_sminn(c)
          end if
+
+         if (use_fan) then
+            col_ninputs(c) = col_ninputs(c) + nitrate_n_to_sminn(c)
+         end if
+
          col_ninputs(c) = col_ninputs(c) + fan_totnin(c)
 
          col_ninputs_partial(c) = col_ninputs(c)
 
          ! calculate total column-level outputs
-         col_noutputs(c) = denit(c) + col_fire_nloss(c)
+         col_noutputs(c) = col_fire_nloss(c)
 
          ! Fluxes to product pools are included in column-level outputs: the product
          ! pools are not included in totcoln, so are outside the system with respect to
@@ -517,13 +528,17 @@ contains
          if (.not. use_nitrif_denitrif) then
             col_noutputs(c) = col_noutputs(c) + sminn_leached(c)
          else
-            col_noutputs(c) = col_noutputs(c) + f_n2o_nit(c)
-
+            col_noutputs(c) = col_noutputs(c) + f_n2o_nit(c) + f_nox_nit(c)
+            col_noutputs(c) = col_noutputs(c) + f_n2o_denit(c) + f_nox_denit(c) + f_n2_denit(c) 
             col_noutputs(c) = col_noutputs(c) + smin_no3_leached(c) + smin_no3_runoff(c)
          end if
 
          col_noutputs(c) = col_noutputs(c) - som_n_leached(c)
          col_noutputs(c) = col_noutputs(c) + fan_totnout(c)
+
+         if (use_fan) then
+            col_noutputs(c) = col_noutputs(c) + nh4_diffusion(c)
+         end if
 
          col_noutputs_partial(c) = col_noutputs(c) - &
                                    wood_harvestn(c) - &
@@ -542,6 +557,7 @@ contains
             write(iulog,*) 'nbalance warning at c =', c, col_errnb(c), col_endnb(c)
             write(iulog,*)'inputs,ffix,nfix,ndep = ',ffix_to_sminn(c)*dt,nfix_to_sminn(c)*dt,ndep_to_sminn(c)*dt
             write(iulog,*)'outputs,lch,roff,dnit = ',smin_no3_leached(c)*dt, smin_no3_runoff(c)*dt,f_n2o_nit(c)*dt
+            !call endrun(msg='N balance warning stop!!')
          end if
 
       end do ! end of columns loop
@@ -615,6 +631,9 @@ contains
             write(iulog,*) 'nbalance warning at g =', g, grc_errnb(g), grc_endnb(g)
          end if
       end do
+
+      !err_found = .false.
+      !write(iulog, *) 'GRIDCELL BALANCE CHECKS DISABLED! At CNBlanceCheckMod.F90: line 629!'
 
       if (err_found) then
          g = err_index

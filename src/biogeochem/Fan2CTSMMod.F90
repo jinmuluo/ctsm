@@ -23,6 +23,7 @@ module Fan2CTSMMod
   ! NH4 fertilizer N.
   
   use FanMod
+  use Fan3Mod
   use shr_kind_mod, only : r8 => shr_kind_r8, CL => shr_kind_cl
   use decompMod                       , only : bounds_type
   use atm2lndType                     , only : atm2lnd_type
@@ -32,14 +33,14 @@ module Fan2CTSMMod
   use shr_infnan_mod                  , only : isnan => shr_infnan_isnan
   use SoilBiogeochemNitrogenStateType , only : soilbiogeochem_nitrogenstate_type
   use SoilBiogeochemNitrogenFluxType  , only : soilbiogeochem_nitrogenflux_type
-  use CNVegNitrogenFluxType	      , only : cnveg_nitrogenflux_type
+  use CNVegNitrogenFluxType           , only : cnveg_nitrogenflux_type
   use WaterStateBulkType              , only : waterstatebulk_type
   use WaterFluxBulkType               , only : waterfluxbulk_type
   use SoilStateType                   , only : soilstate_type
   use ColumnType                      , only : col                
   use PatchType                       , only : patch                
-  use clm_varctl                      , only : iulog
-
+  use clm_varctl                      , only : iulog, use_nitrif_denitrif
+  
   implicit none
 
   private
@@ -206,6 +207,7 @@ contains
     use clm_varcon, only : spval, ispval
     use decompMod, only : bounds_type
     use subgridAveMod, only: p2c
+    use Fan3Mod, only: use_canopy_reduction, use_upward_diffusion
     !
     ! Evaluate the N fluxes and update the state of the FAN pools. Uses the fertilization
     ! flux determined in CropPhenology; the manure inputs come from the FAN stream. The
@@ -224,7 +226,6 @@ contains
     type(temperature_type)                 , intent(in) :: temperature_inst
     type(waterfluxbulk_type)               , intent(in)    :: waterfluxbulk_inst
     type(frictionvel_type)                 , intent(in) :: frictionvel_inst
-
     integer, parameter :: &
          ! Use this many sub-steps. This improves numerical accuracy but is perhaps not
          ! essential, because FAN includes an ad-hoc fixer for negative fluxes.
@@ -242,11 +243,12 @@ contains
     real(r8) :: ndep_org(num_org_n_types) ! gN/m2/sec
     real(r8) :: orgpools(num_org_n_types) ! gN/m2
     real(r8) :: tanprod(num_org_n_types)  ! gN/m2/sec
+
     ! Temporary arrays for N fluxes and pools. Named indices to denote different fluxes.
     ! Numerical indices to denote the age class.
-    real(r8) :: tanpools(num_cls_max)  ! gN/m2
-    real(r8) :: ureapools(num_cls_urea) ! gN/m2
-    real(r8) :: fluxes_tmp(num_fluxes) ! gN/m2/sec
+    real(r8) :: tanpools(num_cls_max)     ! gN/m2
+    real(r8) :: ureapools(num_cls_urea)   ! gN/m2
+    real(r8) :: fluxes_tmp(num_fluxes)    ! gN/m2/sec
     real(r8) :: fluxes(num_fluxes, num_cls_max) ! gN/m2/sec
     ! TAN production flux from urea. Include one extra flux for the residual flux out of U2.
     real(r8) :: tanprod_from_urea(num_cls_urea + 1) ! gN/m2/sec
@@ -271,6 +273,20 @@ contains
     real(r8) :: fert_inc_tan ! urea and NH4 fertilizer incorporated directly to soil, gN/m2/sec
     real(r8) :: fert_generic ! non-urea, non-no3 fertilizer N applied, gN/m2/sec
 
+    ! ------------------- fanv3 development label ------------------------------ 
+    ! temporary matric for fluxes in fanv3, searching the ID in Fan3Mod.F90
+    real(r8) :: fan3fluxes(num_fan3fluxes, num_cls_max)       ! (flux, age),  gN/m2/s
+    real(r8) :: fan3fluxes_temp(num_fan3fluxes) 
+    real(r8) :: fan3fluxes_temp2(num_fan3fluxes) 
+    real(r8) :: nitratepools(num_cls_max)                     ! gN/m2   
+    real(r8) :: RNOx                                          ! unitless 
+    real(r8) :: nitrate_old, nno3, ngas, nrunoff, n_to_soil   ! for balance check
+
+    ! Some temporary variables
+    real(r8) :: nh4_totn
+                          
+    ! --------------- end of fanv3 development label ---------------------------
+    
     ! index and auxiliary variables
     real(r8) :: soilph_min, soilph_max, bsw
     real(r8) :: nsoilman_old, nsoilfert_old
@@ -296,7 +312,7 @@ contains
          forc_ndep_no3 => atm2lnd_inst%forc_ndep_nitr_grc, &   ! Fraction of NO3 in fertilizer N
          ram1 => frictionvel_inst%ram1_patch, & ! Aerodynamic resistance, s/m
          rb1 => frictionvel_inst%rb1_patch)     ! Quasi-laminar layer resistance, s/m
-      
+
     ! Convert the patch fertilizer application (from crop model) to column flux:
     call p2c(bounds, num_soilc, filter_soilc, &
          cnv_nf%synthfert_patch(bounds%begp:bounds%endp), &
@@ -393,25 +409,6 @@ contains
           end if
           ns%fan_grz_fract_col(c) = 1.0_r8 ! for crops handled by handle_storage
        end if
-       !----------------------------------------------------------------------
-       ! NOTE: Hack to set some failing points to zero, see below...
-       ! EBK: 08/30/2022
-       !----------------------------------------------------------------------
-       !if ( (g == 4043) .or. (g == 4047) .or. (g == 3687) )then
-       !   if (isnan(nf%nh3_stores_col(c) ) ) then
-       !      nf%nh3_stores_col(c) = 0.0_r8
-       !   end if
-       !   if (isnan(nf%nh3_barns_col(c) ) .or. (nf%nh3_barns_col(c) > 9.99e99_r8) ) then
-       !      nf%nh3_barns_col(c) = 0.0_r8
-       !   end if
-       !   if (isnan(nf%manure_n_appl_col(c) ) ) then
-       !      nf%manure_n_appl_col(c) = 0.0_r8
-       !   end if
-       !   if (isnan(nf%manure_n_mix_col(c) ) ) then
-       !      nf%manure_n_mix_col(c) = 0.0_r8
-       !   end if
-       !end if
-       !----------------------------------------------------------------------
 
        watertend = waterstatebulk_inst%h2osoi_tend_tsl_col(c) * 1e-3 ! to m/s
        
@@ -428,8 +425,10 @@ contains
        end if
        soilpsi = soilstate_inst%soilpsi_col(c,1)
 
-       ! grazing
-       !
+       ! -------------------- fanv3 development label here ---------------------
+       ! (1) Grazing
+       !  Mon Dec 26 2022
+       ! -----------------------------------------------------------------------
        ngrz = nf%manure_n_grz_col(c)
        ndep_org(ind_avail) = ngrz * (1.0_r8-fract_tan) * fract_avail
        ndep_org(ind_resist) = ngrz * (1.0_r8-fract_tan) * fract_resist
@@ -462,6 +461,16 @@ contains
        n_residual_total = 0.0
        fluxes = 0.0
        n_residual = 0
+
+       ! Initilization of fanv3 pools
+       nitrate_old = get_total_nitrate(c, ns) 
+       fan3fluxes = 0.0
+       fan3fluxes_temp = 0.0
+       RNOx = 0.0
+       nitratepools(1) = ns%nitrate_g1_col(c)
+       nitratepools(2) = ns%nitrate_g2_col(c)
+       nitratepools(3) = ns%nitrate_g3_col(c)
+
        do ind_substep = 1, num_substeps
           call update_npool(tg, ratm, &
                theta, thetasat, infiltr_m_s, evap_m_s, &
@@ -479,25 +488,32 @@ contains
           end if
           fluxes_tmp = fluxes_tmp + sum(fluxes(:,1:num_cls_grz), dim=2)
           n_residual_total = n_residual_total + n_residual
+
+          ! update of fanv3 nitrate pools here, use the fluxes from fanv2 every sub-time step 
+          call eval_nitrification_n2o_nox(fluxes(iflx_no3,1:num_cls_grz), theta, thetasat, &
+               ns%S_diffus_col(c, 1), fan3fluxes(no3flux_id, 1:num_cls_grz), &
+               fan3fluxes(n2o_n_id, 1:num_cls_grz), fan3fluxes(nox_n_id, 1:num_cls_grz), RNOx)
+
+          call eval_denitrification_n2o_nox(nitratepools(1:num_cls_grz), theta, thetasat, RNOx, &
+               ns%S_fmax_denit_carbonsubstrate_vr_col(c, 1), ns%S_anaerobic_frac_col(c, 1), &
+               ns%S_diffus_col(c, 1), ns%S_soil_co2_prod_col(c, 1), & 
+               fan3fluxes(n2o_dn_id, 1:num_cls_grz), fan3fluxes(nox_dn_id, 1:num_cls_grz), & 
+               fan3fluxes(n2_dn_id, 1:num_cls_grz))
+
+          call eval_nitrate_loss(nitratepools(1:num_cls_grz), runoff_m_s, theta, thetasat, & 
+               dt/num_substeps, fan3fluxes(n2o_dn_id, 1:num_cls_grz), &
+               fan3fluxes(nox_dn_id, 1:num_cls_grz), fan3fluxes(n2_dn_id, 1:num_cls_grz), &
+               ns%smin_no3_vr_col(c,1), fan3fluxes(runoff_id, 1:num_cls_grz), &
+               fan3fluxes(atm_id, 1:num_cls_grz), fan3fluxes(deepsoil_id, 1:num_cls_grz))
+
+          call update_nitrate_pool(nitratepools(1:num_cls_grz), 0.0_r8, dt/num_substeps, & 
+               fan3fluxes(runoff_id, 1:num_cls_grz), fan3fluxes(atm_id, 1:num_cls_grz), & 
+               fan3fluxes(deepsoil_id, 1:num_cls_grz), fan3fluxes(no3flux_id, 1:num_cls_grz))  
+
+          fan3fluxes_temp = fan3fluxes_temp + sum(fan3fluxes(:, 1:num_cls_grz), dim=2)
+            
        end do
-       !----------------------------------------------------------------------
-       ! NOTE: Hack to set some failing points to zero
-       ! Thare are three points that are failing (in the f19 grid) and give fluxes of NaN's, set
-       ! these points to zero, so that the model will work for other points.
-       ! Once, we get the model updated to a current verion we will examine
-       ! these points in detail, and figure out why they aren't working and fix
-       ! FAN so they do work.
-       ! This will need to be changed when g no longer has a global index.
-       ! EBK: 08/30/2022
-       !----------------------------------------------------------------------
-       !
-       !if ( (g == 4043) .or. (g == 4047) .or. (g == 3687) )then
-       !   if (any(isnan(fluxes_tmp))) then
-       !      fluxes_tmp = 0.0_r8
-       !      fluxes = 0.0_r8
-       !   end if
-       !end if
-       !----------------------------------------------------------------------
+
        fluxes_tmp = fluxes_tmp / num_substeps
 
        ns%tan_g1_col(c) = tanpools(1)
@@ -511,7 +527,39 @@ contains
             = fluxes_tmp(iflx_soild) + fluxes_tmp(iflx_soilq) &
               + n_residual_total / dt + soilflux_org
 
-       ! Manure application
+       ! fanv3 output definitions
+       ns%nitrate_g1_col(c) = nitratepools(1)
+       ns%nitrate_g2_col(c) = nitratepools(2)
+       ns%nitrate_g3_col(c) = nitratepools(3)
+
+       fan3fluxes_temp = fan3fluxes_temp / num_substeps 
+       nf%n2o_nitrify_grz_col(c)        = fan3fluxes_temp(n2o_n_id)
+       nf%nox_nitrify_grz_col(c)        = fan3fluxes_temp(nox_n_id)
+       nf%n2o_denitrify_grz_col(c)      = fan3fluxes_temp(n2o_dn_id)
+       nf%nox_denitrify_grz_col(c)      = fan3fluxes_temp(nox_dn_id)
+       nf%n2_denitrify_grz_col(c)       = fan3fluxes_temp(n2_dn_id)
+
+       ! first time add the flux from grazing into total flux
+       nf%manure_nitrate_runoff_col(c)  = fan3fluxes_temp(runoff_id)
+       nf%manure_nitrate_to_soil_col(c) = fan3fluxes_temp(deepsoil_id)
+
+       nf%nox_nitrify_total_col(c)      = nf%nox_nitrify_grz_col(c)
+       nf%nox_denitrify_total_col(c)    = nf%nox_denitrify_grz_col(c) 
+       nf%n2o_nitrify_total_col(c)      = nf%n2o_nitrify_grz_col(c)
+       nf%n2o_denitrify_total_col(c)    = nf%n2o_denitrify_grz_col(c)      
+
+       nf%nox_total_col(c) = nf%nox_nitrify_grz_col(c) + nf%nox_denitrify_grz_col(c)
+       nf%n2o_total_col(c) = nf%n2o_nitrify_grz_col(c) + nf%n2o_denitrify_grz_col(c)
+       nf%n2_total_col(c)  = nf%n2_denitrify_grz_col(c)
+
+       ! ---------------- end of fanv3 development label (grazing) -------------
+
+
+       ! -------------------- fanv3 development label here ---------------------
+       ! (2) Manure in Slurry
+       !  Mon Dec 28 2022
+       ! Question remain: the fertilizers rate? 
+       ! -----------------------------------------------------------------------
 
        org_n_tot = nf%manure_n_appl_col(c) - nf%manure_tan_appl_col(c)
        ! Use the the same fractionation of organic N as for grazing, after removing the
@@ -540,6 +588,16 @@ contains
        fluxes_tmp = 0.0
        n_residual_total = 0.0
        fluxes = 0.0
+       
+       ! Initialization of fanv3 pools and some temporary matrix
+       fan3fluxes = 0.0
+       fan3fluxes_temp = 0.0
+       RNOx = 0.0
+       nitratepools(1) = ns%nitrate_s0_col(c)
+       nitratepools(2) = ns%nitrate_s1_col(c)
+       nitratepools(3) = ns%nitrate_s2_col(c)
+       nitratepools(4) = ns%nitrate_s3_col(c)
+
        do ind_substep = 1, num_substeps
           call update_4pool(tg, ratm, theta, thetasat, infiltr_m_s, evap_m_s, &
                wateratm2lndbulk_inst%forc_q_downscaled_col(c), watertend, &
@@ -555,18 +613,32 @@ contains
           end if
           fluxes_tmp = fluxes_tmp + sum(fluxes(:,1:num_cls_slr), dim=2)
           n_residual_total = n_residual_total + n_residual
+       
+          ! update of fanv3 nitrate pools here, use the fluxes every sub-time step 
+          call eval_nitrification_n2o_nox(fluxes(iflx_no3,1:num_cls_slr), theta, thetasat, &
+               ns%S_diffus_col(c, 1), fan3fluxes(no3flux_id, 1:num_cls_slr), &
+               fan3fluxes(n2o_n_id, 1:num_cls_slr), fan3fluxes(nox_n_id, 1:num_cls_slr), RNOx)
+
+          call eval_denitrification_n2o_nox(nitratepools(1:num_cls_slr), theta, thetasat, RNOx, &
+               ns%S_fmax_denit_carbonsubstrate_vr_col(c, 1), ns%S_anaerobic_frac_col(c, 1), &
+               ns%S_diffus_col(c, 1), ns%S_soil_co2_prod_col(c, 1), &
+               fan3fluxes(n2o_dn_id, 1:num_cls_slr), fan3fluxes(nox_dn_id, 1:num_cls_slr), &
+               fan3fluxes(n2_dn_id, 1:num_cls_slr))
+
+          call eval_nitrate_loss(nitratepools(1:num_cls_slr), runoff_m_s, theta, thetasat, &
+               dt/num_substeps, fan3fluxes(n2o_dn_id, 1:num_cls_slr), &
+               fan3fluxes(nox_dn_id, 1:num_cls_slr), fan3fluxes(n2_dn_id, 1:num_cls_slr), &
+               ns%smin_no3_vr_col(c,1), fan3fluxes(runoff_id, 1:num_cls_slr), &
+               fan3fluxes(atm_id, 1:num_cls_slr), fan3fluxes(deepsoil_id, 1:num_cls_slr))
+
+          call update_nitrate_pool(nitratepools(1:num_cls_slr), 0.0_r8, dt/num_substeps, &
+               fan3fluxes(runoff_id, 1:num_cls_slr), fan3fluxes(atm_id, 1:num_cls_slr), &
+               fan3fluxes(deepsoil_id, 1:num_cls_slr), fan3fluxes(no3flux_id, 1:num_cls_slr))
+
+          fan3fluxes_temp = fan3fluxes_temp + sum(fan3fluxes(:, 1:num_cls_slr), dim=2)
+
        end do
-       !----------------------------------------------------------------------
-       ! NOTE: Hack to set some failing points to zero, see above...
-       ! EBK: 08/30/2022
-       !----------------------------------------------------------------------
-       !if ( (g == 4043) .or. (g == 4047) .or. (g == 3687) )then
-       !   if (any(isnan(fluxes_tmp))) then
-       !      fluxes_tmp = 0.0_r8
-       !      fluxes = 0.0_r8
-       !   end if
-       !end if
-       !----------------------------------------------------------------------
+
        fluxes_tmp = fluxes_tmp / num_substeps
 
        ns%tan_s0_col(c) = tanpools(1)
@@ -581,7 +653,40 @@ contains
             = nf%manure_nh4_to_soil_col(c) + fluxes_tmp(iflx_soild) + fluxes_tmp(iflx_soilq) &
             + n_residual_total / dt + soilflux_org
 
-       ! Fertilizer
+      ! fanv3 output definitions
+       ns%nitrate_s0_col(c) = nitratepools(1)
+       ns%nitrate_s1_col(c) = nitratepools(2)
+       ns%nitrate_s2_col(c) = nitratepools(3)
+       ns%nitrate_s3_col(c) = nitratepools(4)
+
+       fan3fluxes_temp = fan3fluxes_temp / num_substeps
+       nf%n2o_nitrify_app_col(c)        = fan3fluxes_temp(n2o_n_id)
+       nf%nox_nitrify_app_col(c)        = fan3fluxes_temp(nox_n_id)
+       nf%n2o_denitrify_app_col(c)      = fan3fluxes_temp(n2o_dn_id)
+       nf%nox_denitrify_app_col(c)      = fan3fluxes_temp(nox_dn_id)
+       nf%n2_denitrify_app_col(c)       = fan3fluxes_temp(n2_dn_id)
+
+       ! the second time add flux from slurry into the total flux 
+       nf%manure_nitrate_runoff_col(c)  = nf%manure_nitrate_runoff_col(c) + fan3fluxes_temp(runoff_id)
+       nf%manure_nitrate_to_soil_col(c) = nf%manure_nitrate_to_soil_col(c) + fan3fluxes_temp(deepsoil_id)
+
+       nf%nox_nitrify_total_col(c)      = nf%nox_nitrify_total_col(c) + nf%nox_nitrify_app_col(c)
+       nf%nox_denitrify_total_col(c)    = nf%nox_denitrify_total_col(c) + nf%nox_denitrify_app_col(c)
+       nf%n2o_nitrify_total_col(c)      = nf%n2o_nitrify_total_col(c) + nf%n2o_nitrify_app_col(c)       
+       nf%n2o_denitrify_total_col(c)    = nf%n2o_denitrify_total_col(c) + nf%n2o_denitrify_app_col(c)
+
+       nf%n2o_total_col(c)  = nf%n2o_total_col(c) + nf%n2o_nitrify_app_col(c) + nf%n2o_denitrify_app_col(c)       
+       nf%nox_total_col(c)  = nf%nox_total_col(c) + nf%nox_nitrify_app_col(c) + nf%nox_denitrify_app_col(c)
+       nf%n2_total_col(c)   = nf%n2_total_col(c) +  nf%n2_denitrify_app_col(c)
+
+       ! ------------- end of fanv3 development label (manure)------------------
+
+
+       ! -------------------- fanv3 development label here ---------------------
+       ! (3) Fertilizers(Urea and non-urea) 
+       !  Mon Dec 28 2022
+       ! Question remain: 
+       ! -----------------------------------------------------------------------
        ! split fertilizer N berween urea, no3 and the remaining other ammonium-N.
        fert_total = nf%fert_n_appl_col(c)
        !forc_ndep_urea = atm2lnd_inst%forc_ndep_urea_grc(g)
@@ -632,6 +737,17 @@ contains
        n_residual_total = 0.0
        fluxes = 0.0
        nf%nh3_otherfert_col(c) = 0.0
+
+       ! Initialization of fanv3 pools and some temporary matrix
+       fan3fluxes = 0.0
+       fan3fluxes_temp = 0.0
+       fan3fluxes_temp2 = 0.0
+       RNOx = 0.0
+       nitratepools(1) = ns%nitrate_f1_col(c)
+       nitratepools(2) = ns%nitrate_f2_col(c)
+       nitratepools(3) = ns%nitrate_f3_col(c)
+       nitratepools(4) = ns%nitrate_f4_col(c)
+
        do ind_substep = 1, num_substeps
           ! Fertilizer pools f1...f3
           call update_npool(tg, ratm, theta, thetasat, infiltr_m_s, evap_m_s, &
@@ -647,6 +763,29 @@ contains
           fluxes_tmp = fluxes_tmp + sum(fluxes(:,1:num_cls_fert), dim=2) / num_substeps
           n_residual_total = n_residual_total + n_residual
 
+          ! update of fanv3 nitrate pools(f1, f2 and f3), use the fluxes every sub-time step 
+          call eval_nitrification_n2o_nox(fluxes(iflx_no3,1:num_cls_fert), theta, thetasat, &
+               ns%S_diffus_col(c, 1), fan3fluxes(no3flux_id, 1:num_cls_fert), &
+               fan3fluxes(n2o_n_id, 1:num_cls_fert), fan3fluxes(nox_n_id, 1:num_cls_fert), RNOx)
+
+          call eval_denitrification_n2o_nox(nitratepools(1:num_cls_fert), theta, thetasat, RNOx, &
+               ns%S_fmax_denit_carbonsubstrate_vr_col(c, 1), ns%S_anaerobic_frac_col(c, 1), &
+               ns%S_diffus_col(c, 1), ns%S_soil_co2_prod_col(c, 1), &
+               fan3fluxes(n2o_dn_id, 1:num_cls_fert), fan3fluxes(nox_dn_id, 1:num_cls_fert), &
+               fan3fluxes(n2_dn_id, 1:num_cls_fert))
+
+          call eval_nitrate_loss(nitratepools(1:num_cls_fert), runoff_m_s, theta, thetasat, &
+               dt/num_substeps, fan3fluxes(n2o_dn_id, 1:num_cls_fert), &
+               fan3fluxes(nox_dn_id, 1:num_cls_fert), fan3fluxes(n2_dn_id, 1:num_cls_fert), &
+               ns%smin_no3_vr_col(c,1), fan3fluxes(runoff_id, 1:num_cls_fert), &
+               fan3fluxes(atm_id, 1:num_cls_fert), fan3fluxes(deepsoil_id, 1:num_cls_fert))
+
+          call update_nitrate_pool(nitratepools(1:num_cls_fert), 0.0_r8, dt/num_substeps, &
+               fan3fluxes(runoff_id, 1:num_cls_fert), fan3fluxes(atm_id, 1:num_cls_fert), &
+               fan3fluxes(deepsoil_id, 1:num_cls_fert), fan3fluxes(no3flux_id, 1:num_cls_fert))
+
+          fan3fluxes_temp = fan3fluxes_temp + sum(fan3fluxes(:, 1:num_cls_fert), dim=2)
+
           ! Fertilizer pool f4
           call update_npool(tg, ratm, theta, thetasat, infiltr_m_s, evap_m_s, &
                wateratm2lndbulk_inst%forc_q_downscaled_col(c), watertend, &
@@ -661,18 +800,31 @@ contains
           fluxes_tmp = fluxes_tmp + fluxes(:, 1) / num_substeps
           n_residual_total = n_residual_total + n_residual
           nf%nh3_otherfert_col(c) = nf%nh3_otherfert_col(c) + fluxes(iflx_air, 1) / num_substeps
+
+          ! update of fanv3 nitrate pools(f4), use the fluxes every sub-time step 
+          call eval_nitrification_n2o_nox(fluxes(iflx_no3,1:1), theta, thetasat, & 
+               ns%S_diffus_col(c, 1), fan3fluxes(no3flux_id, 1:1), &
+               fan3fluxes(n2o_n_id, 1:1), fan3fluxes(nox_n_id, 1:1), RNOx)
+
+          call eval_denitrification_n2o_nox(nitratepools(4:4), theta, thetasat, RNOx, &
+               ns%S_fmax_denit_carbonsubstrate_vr_col(c, 1), ns%S_anaerobic_frac_col(c, 1), &
+               ns%S_diffus_col(c, 1), ns%S_soil_co2_prod_col(c, 1), &
+               fan3fluxes(n2o_dn_id, 1:1), fan3fluxes(nox_dn_id, 1:1), &
+               fan3fluxes(n2_dn_id, 1:1))
+
+          call eval_nitrate_loss(nitratepools(4:4), runoff_m_s, theta, thetasat, & 
+               dt/num_substeps, fan3fluxes(n2o_dn_id, 1:1), fan3fluxes(nox_dn_id, 1:1), &
+               fan3fluxes(n2_dn_id, 1:1), ns%smin_no3_vr_col(c,1), &
+               fan3fluxes(runoff_id, 1:1),fan3fluxes(atm_id, 1:1), &
+               fan3fluxes(deepsoil_id, 1:1))
+
+          call update_nitrate_pool(nitratepools(4:4), fert_no3, dt/num_substeps, &
+               fan3fluxes(runoff_id, 1:1), fan3fluxes(atm_id, 1:1), &
+               fan3fluxes(deepsoil_id, 1:1), fan3fluxes(no3flux_id, 1:1))
+
+          fan3fluxes_temp2 = fan3fluxes_temp2 + sum(fan3fluxes(:, 1:1), dim=2)
+
        end do
-       !----------------------------------------------------------------------
-       ! NOTE: Hack to set some failing points to zero, see above...
-       ! EBK: 08/30/2022
-       !----------------------------------------------------------------------
-       !if ( (g == 4043) .or. (g == 4047) .or. (g == 3687) )then
-       !   if (any(isnan(fluxes_tmp))) then
-       !      fluxes_tmp = 0.0_r8
-       !      fluxes = 0.0_r8
-       !   end if
-       !end if
-       !----------------------------------------------------------------------
 
        ns%tan_f1_col(c) = tanpools(1)
        ns%tan_f2_col(c) = tanpools(2)
@@ -685,6 +837,73 @@ contains
        nf%fert_nh4_to_soil_col(c) = fluxes_tmp(iflx_soild) + fluxes_tmp(iflx_soilq) &
             + n_residual_total/dt + fert_inc_tan
 
+      ! fanv3 output definitions
+       ns%nitrate_f1_col(c) = nitratepools(1)
+       ns%nitrate_f2_col(c) = nitratepools(2)
+       ns%nitrate_f3_col(c) = nitratepools(3)
+       ns%nitrate_f4_col(c) = nitratepools(4)
+       
+       fan3fluxes_temp = fan3fluxes_temp / num_substeps
+       fan3fluxes_temp2 = fan3fluxes_temp2 / num_substeps
+
+       nf%n2o_nitrify_fert_col(c)        = fan3fluxes_temp(n2o_n_id)
+       nf%nox_nitrify_fert_col(c)        = fan3fluxes_temp(nox_n_id)
+       nf%n2o_denitrify_fert_col(c)      = fan3fluxes_temp(n2o_dn_id)
+       nf%nox_denitrify_fert_col(c)      = fan3fluxes_temp(nox_dn_id)
+       nf%n2_denitrify_fert_col(c)       = fan3fluxes_temp(n2_dn_id)
+
+       nf%n2o_nitrify_otherfert_col(c)   = fan3fluxes_temp2(n2o_n_id)
+       nf%nox_nitrify_otherfert_col(c)   = fan3fluxes_temp2(nox_n_id)
+       nf%n2o_denitrify_otherfert_col(c) = fan3fluxes_temp2(n2o_dn_id)
+       nf%nox_denitrify_otherfert_col(c) = fan3fluxes_temp2(nox_dn_id)
+       nf%n2_denitrify_otherfert_col(c)  = fan3fluxes_temp2(n2_dn_id)
+
+       ! the third time add the flux from fertilizers into the total flux 
+       nf%fert_nitrate_runoff_col(c)  = fan3fluxes_temp(runoff_id) + fan3fluxes_temp2(runoff_id)
+       nf%fert_nitrate_to_soil_col(c) = fan3fluxes_temp(deepsoil_id) + fan3fluxes_temp2(deepsoil_id)
+
+       nf%nox_nitrify_total_col(c)    = nf%nox_nitrify_total_col(c) + nf%nox_nitrify_fert_col(c) &
+                                        + nf%nox_nitrify_otherfert_col(c) 
+       nf%nox_denitrify_total_col(c)  = nf%nox_denitrify_total_col(c) + nf%nox_denitrify_fert_col(c) &
+                                        + nf%nox_denitrify_otherfert_col(c)
+       nf%n2o_nitrify_total_col(c)    = nf%n2o_nitrify_total_col(c) + nf%n2o_nitrify_fert_col(c) &
+                                        + nf%n2o_nitrify_otherfert_col(c)
+       nf%n2o_denitrify_total_col(c)  = nf%n2o_denitrify_total_col(c) + nf%n2o_denitrify_fert_col(c) &
+                                        + nf%n2o_denitrify_otherfert_col(c)
+
+       nf%nox_total_col(c)            = nf%nox_total_col(c) + nf%nox_nitrify_fert_col(c) & 
+                                        + nf%nox_denitrify_fert_col(c) + nf%nox_nitrify_otherfert_col(c) &
+                                        + nf%nox_denitrify_otherfert_col(c)
+       nf%n2o_total_col(c)            = nf%n2o_total_col(c) + nf%n2o_nitrify_fert_col(c) & 
+                                        + nf%n2o_denitrify_fert_col(c) + nf%n2o_nitrify_otherfert_col(c) &
+                                        + nf%n2o_denitrify_otherfert_col(c)
+       nf%n2_total_col(c)             = nf%n2_total_col(c) + nf%n2_denitrify_fert_col(c) & 
+                                        + nf%n2_denitrify_otherfert_col(c)
+      
+       ! total nitrate pool
+       ns%nitrate_totn_col(c) = get_total_nitrate(c, ns) 
+
+       ! NOx emission after captured by canopy.
+       if (use_canopy_reduction) then 
+          nf%canopy_to_soil_col(c) = ( 1 - ns%CR_col(c) ) * nf%nox_total_col(c) 
+          nf%nox_total_col(c) = ns%CR_col(c) * nf%nox_total_col(c)
+          ! This part of emission have been included in NOx total, they are outputted for diagnostic.
+          nf%nox_nitrify_total_col(c) = ns%CR_col(c) * nf%nox_nitrify_total_col(c)
+          nf%nox_denitrify_total_col(c) = ns%CR_col(c) * nf%nox_denitrify_total_col(c)
+       else
+          nf%canopy_to_soil_col(c) = 0.0_r8
+       end if 
+       ! fanv3 balance check in all column solely
+       if (do_balance_checks) then
+          nno3 = nf%fert_no3_to_soil_col(c) + nf%manure_no3_to_soil_col(c)
+          ngas = nf%nox_total_col(c) + nf%n2o_total_col(c) + nf%n2_total_col(c)
+          nrunoff = nf%fert_nitrate_runoff_col(c) + nf%manure_nitrate_runoff_col(c)
+          n_to_soil = nf%fert_nitrate_to_soil_col(c) + nf%manure_nitrate_to_soil_col(c) + nf%canopy_to_soil_col(c)
+          call nitrate_balance_check(c, dt, ns, nf, nno3, nitrate_old, ns%nitrate_totn_col(c), ngas, nrunoff, n_to_soil)
+       end if
+
+       ! ------------- end of fanv3 development label (fertilizers) ------------
+
        ! Total flux
        ! 
        nf%nh3_total_col(c) = nf%nh3_fert_col(c) + nf%nh3_manure_app_col(c) &
@@ -692,19 +911,39 @@ contains
        if (nf%nh3_total_col(c) < -1e15) then
           call endrun(msg='ERROR: FAN, negative total emission')
        end if
-       !if ( (g == 3687) .or. (g == 4043) .or. (g == 4047) )then
-       !    write(iulog, *) 'g=', g, ' c=', c, 'nh3_total_col=', nf%nh3_total_col(c), 'fert=', nf%nh3_fert_col(c), &
-       !      'app=', nf%nh3_manure_app_col(c), 'grz=', nf%nh3_grz_col(c), 'stores=', nf%nh3_stores_col(c), 'barns=', nf%nh3_barns_col(c)
-       !end if
-    end do
+      
+       ! upward of ammonium from CLM
+       if (use_nitrif_denitrif .and. use_upward_diffusion) then
+          nh4_totn = ns%tan_g1_col(c) + ns%tan_g2_col(c) + ns%tan_g3_col(c) &
+               + ns%manure_u_grz_col(c) + ns%manure_a_grz_col(c) + ns%manure_r_grz_col(c) &
+               + ns%tan_s0_col(c) + ns%tan_s1_col(c) + ns%tan_s2_col(c) + ns%tan_s3_col(c) &
+               + ns%manure_u_app_col(c) + ns%manure_a_app_col(c) + ns%manure_r_app_col(c) &
+               + ns%tan_f1_col(c) + ns%tan_f2_col(c) + ns%tan_f3_col(c) + ns%tan_f4_col(c) &
+               + ns%fert_u1_col(c) + ns%fert_u2_col(c)
+ 
+          if (nh4_totn < ns%smin_nh4_vr_col(c, 1)) then
+             call eval_nh4_upward(nh4_totn, ns%smin_nh4_vr_col(c, 1), dt, &
+                                  theta, thetasat, nf%nh4_upward_diffusion_col(c))
 
+             ns%tan_g3_col(c) = ns%tan_g3_col(c) + nf%nh4_upward_diffusion_col(c)*dt
+          else
+             nf%nh4_upward_diffusion_col(c) = 0.0_r8
+          end if
+       else
+          ! Not evaluate the upward diffusion of ammonium
+          nf%nh4_upward_diffusion_col(c) = 0.0_r8
+       end if 
+ 
+    end do
+    
+    ! balance check
     if (do_balance_checks) then
        call balance_check('Manure', nsoilman_old, &
             get_total_n(ns, nf, 'pools_manure'), get_total_n(ns, nf, 'fluxes_manure'))
        call balance_check('Fertilizer', nsoilfert_old, &
             get_total_n(ns, nf, 'pools_fertilizer'), get_total_n(ns, nf, 'fluxes_fertilizer'))
     end if
-
+    
     call update_summary(ns, nf, filter_soilc, num_soilc)
     
     end associate
@@ -744,7 +983,8 @@ contains
               - sum(nf%nh3_grz_col(soilc)) - sum(nf%manure_nh4_runoff_col(soilc))
          total = total - sum(nf%manure_no3_to_soil_col(soilc)) - sum(nf%manure_nh4_to_soil_col(soilc))
          total = total - sum(nf%manure_n_transf_col(soilc)) - sum(nf%nh3_stores_col(soilc)) - sum(nf%nh3_barns_col(soilc))
-         
+         total = total + sum(nf%nh4_upward_diffusion_col(soilc))
+
       case('pools_fertilizer')
          total = sum(ns%tan_f1_col((soilc))) + sum(ns%tan_f2_col((soilc))) + sum(ns%tan_f3_col(soilc)) &
               + sum(ns%tan_f4_col(soilc))
@@ -754,7 +994,7 @@ contains
          total = sum(nf%fert_n_appl_col(soilc))
          total = total - sum(nf%nh3_fert_col(soilc)) - sum(nf%fert_nh4_runoff_col(soilc))
          total = total - sum(nf%fert_no3_to_soil_col(soilc)) - sum(nf%fert_nh4_to_soil_col(soilc))
-         
+ 
       case default
          call endrun(msg='Bad argument to get_total_n')
          
@@ -763,6 +1003,20 @@ contains
       end associate
 
     end function get_total_n
+
+    real(r8) function get_total_nitrate(c, ns) result(total)
+      type(soilbiogeochem_nitrogenstate_type), intent(in) :: ns
+      integer, intent(in) :: c
+
+      total = 0.0_r8
+
+      ! only return the column level for fanv3 column check!
+      total  = ns%nitrate_g1_col(c) + ns%nitrate_g2_col(c) + ns%nitrate_g3_col(c) &
+               + ns%nitrate_s0_col(c) + ns%nitrate_s1_col(c) + ns%nitrate_s2_col(c) &
+               + ns%nitrate_s3_col(c) + ns%nitrate_f1_col(c) + ns%nitrate_f2_col(c) &
+               + ns%nitrate_f3_col(c) + ns%nitrate_f4_col(c)
+
+    end function get_total_nitrate
     
     subroutine balance_check(label, total_old, total_new, flux)
       ! Check and report that the net flux equals the accumulated mass in pools. The
@@ -775,8 +1029,44 @@ contains
       
       diff = total_new - total_old
       accflux = flux*dt
-      
+ 
     end subroutine balance_check
+    
+    subroutine nitrate_balance_check(c, dt, ns, nf, nh4_to_no3, &
+               nitrate_old, nitrate_new, gas, runoff, to_soil)
+      ! Check the nitrate balance after goes into fanv3 mod
+      integer :: c
+      real(r8), intent(in) :: dt
+      type(soilbiogeochem_nitrogenflux_type), intent(in) :: nf
+      type(soilbiogeochem_nitrogenstate_type), intent(in) :: ns
+      real(r8), intent(in) :: nh4_to_no3
+      real(r8), intent(in) :: nitrate_old
+      real(r8), intent(in) :: nitrate_new
+      real(r8), intent(in) :: gas
+      real(r8), intent(in) :: runoff
+      real(r8), intent(in) :: to_soil
+     
+      real(r8) :: fdiff, ndiff 
+      real(r8) :: tolerance=1e-12_r8
+      integer :: year, mon, day, tod
+
+      ndiff = nitrate_new - nitrate_old
+      fdiff = nh4_to_no3*dt - (gas + runoff + to_soil)*dt
+      
+      if (abs(ndiff - fdiff) >= tolerance) then
+         call get_curr_date(year, mon, day, tod)
+         write(iulog, *) 'fanv3 n balance warning in column', c
+         write(iulog, *) 'time step = ', dt
+         write(iulog, *) 'current year, month, day, time ', year, mon, day, tod
+         write(iulog, *) 'ndiff, fdiff =', ndiff, fdiff
+         write(iulog, *) 'nitrate old =', nitrate_old
+         write(iulog, *) 'nitrate new =', nitrate_new
+         write(iulog, *) 'fanv2 no3 flux', nh4_to_no3*dt
+         write(iulog, *) 'gas, runoff, tosoil', gas*dt, runoff*dt, to_soil*dt
+         call endrun(msg='fanv3 n balance stop !!!')
+      end if  
+
+    end subroutine nitrate_balance_check
     
   end subroutine fan_eval
 
@@ -1043,6 +1333,8 @@ contains
        total = total + ns%manure_u_app_col(c) + ns%manure_a_app_col(c) + ns%manure_r_app_col(c)
        total = total + ns%tan_f1_col(c) + ns%tan_f2_col(c) + ns%tan_f3_col(c) + ns%tan_f4_col(c)
        total = total + ns%fert_u1_col(c) + ns%fert_u2_col(c)
+       ! add the nitrate pools from fanv3 into fan total n pool here
+       total = total + ns%nitrate_totn_col(c) 
        ns%fan_totn_col(c) = total
        
        if (lun%itype(col%landunit(c)) == istcrop) then
@@ -1054,13 +1346,19 @@ contains
           fluxin = nf%manure_n_grz_col(c) + nf%manure_n_appl_col(c)
        end if
 
+       fluxin = fluxin + nf%nh4_upward_diffusion_col(c)
+      
+       ! include the gas, runoff loss of fanv3 here, replace nitrify flux from fanv2 with 
+       ! deepsoil diffusion from fanv3
        flux_loss = nf%nh3_manure_app_col(c) + nf%nh3_grz_col(c) + nf%manure_nh4_runoff_col(c) &
             + nf%nh3_stores_col(c) + nf%nh3_barns_col(c) &
-            + nf%nh3_fert_col(c) + nf%fert_nh4_runoff_col(c)
-       fluxout = nf%fert_no3_to_soil_col(c) + nf%fert_nh4_to_soil_col(c) &
-            + nf%manure_no3_to_soil_col(c) + nf%manure_nh4_to_soil_col(c) &
-            + nf%manure_n_transf_col(c) + flux_loss
-       
+            + nf%nh3_fert_col(c) + nf%fert_nh4_runoff_col(c) &
+            + nf%nox_total_col(c) + nf%n2o_total_col(c) + nf%n2_total_col(c) &
+            + nf%fert_nitrate_runoff_col(c) + nf%manure_nitrate_runoff_col(c) 
+       fluxout = nf%fert_nh4_to_soil_col(c) + nf%manure_nh4_to_soil_col(c) &
+            + nf%manure_n_transf_col(c) + nf%canopy_to_soil_col(c) + flux_loss &
+            + nf%fert_nitrate_to_soil_col(c) + nf%manure_nitrate_to_soil_col(c)
+
        nf%fan_totnin_col(c) = fluxin
        nf%fan_totnout_col(c) = fluxout
        nf%manure_n_total_col(c) = nf%manure_n_grz_col(c) + nf%manure_n_barns_col(c)
@@ -1087,24 +1385,29 @@ contains
     real(r8), intent(inout) :: nfertilization_patch(bounds%begp:) 
     
     integer :: c, fc, p
-    real(r8) :: flux_manure, flux_fert, manure_prod
+    real(r8) :: flux_manure, flux_fert, manure_prod, flux_nitrate, canopy_flux
     logical :: included
     
     if (.not. (fan_to_bgc_veg .or. fan_to_bgc_crop)) return
     
     do fc = 1, num_soilc
        c = filter_soilc(fc)
-       flux_manure = sbgc_nf%manure_no3_to_soil_col(c) + sbgc_nf%manure_nh4_to_soil_col(c)
-       flux_fert = sbgc_nf%fert_no3_to_soil_col(c) + sbgc_nf%fert_nh4_to_soil_col(c)
+       ! Use the deepsoil diffusion from fanv3, it would be positive or negative!
+       flux_manure = sbgc_nf%manure_nh4_to_soil_col(c)
+       flux_fert = sbgc_nf%fert_nh4_to_soil_col(c)
        manure_prod = sbgc_nf%manure_n_barns_col(c) + sbgc_nf%manure_n_grz_col(c)
-       
+       flux_nitrate = sbgc_nf%manure_nitrate_to_soil_col(c) + sbgc_nf%fert_nitrate_to_soil_col(c)
+       canopy_flux = sbgc_nf%canopy_to_soil_col(c)
+ 
        included = (lun%itype(col%landunit(c)) == istcrop .and. fan_to_bgc_crop) &
              .or. (lun%itype(col%landunit(c)) == istsoil .and. fan_to_bgc_veg)
        
        if (included) then
-          sbgc_nf%fert_to_sminn_col(c) = flux_fert + flux_manure
+          sbgc_nf%fert_to_sminn_col(c) = flux_fert + flux_manure + canopy_flux
           sbgc_nf%manure_n_to_sminn_col(c) = flux_manure
           sbgc_nf%synthfert_n_to_sminn_col(c) = flux_fert
+          ! for nitrate deepsoil diffusion 
+          sbgc_nf%nitrate_n_to_sminn_col(c) = flux_nitrate
           do p = col%patchi(c), col%patchf(c)
              ! NFERTILIZATION gets the fertilizer applied + all manure N produced in the
              ! column. Note that if fract_spread_grass > 0 then some of this N might be
@@ -1115,5 +1418,6 @@ contains
     end do
     
   end subroutine fan_to_sminn
-  
+ 
+
 end module Fan2CTSMMod
