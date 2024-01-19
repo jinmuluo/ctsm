@@ -349,7 +349,7 @@ contains
     !-----------------------------------------------------------------------
 
     associate(                                                                  &   
-         synthfert     =>    cnveg_nitrogenflux_inst%synthfert_patch ,          & ! Input:  [real(r8) (:)]  nitrogen fertilizer rate (gN/m2/s)
+         synthfert     =>    cnveg_nitrogenflux_inst%fert_patch ,               & ! Input:  [real(r8) (:)]  nitrogen fertilizer rate (gN/m2/s)
          manure        =>    cnveg_nitrogenflux_inst%manure_patch ,             & ! Input:  [real(r8) (:)]  manure nitrogen rate (gN/m2/s)
          totalfert     =>    cnveg_nitrogenflux_inst%nfertilization_patch,      & ! Input:  [real(r8) (:)]  manure nitrogen rate (gN/m2/s)                
          fert_to_sminn =>    soilbiogeochem_nitrogenflux_inst%fert_to_sminn_col & ! Output: [real(r8) (:)]                                                    

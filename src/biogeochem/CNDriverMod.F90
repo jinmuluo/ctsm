@@ -302,7 +302,7 @@ contains
     ! --------------------------------------------------
 
     call t_startf('CNDeposition')
-    call CNNDeposition(bounds, num_soilc, filter_soilc, &
+    call CNNDeposition(bounds, num_bgc_soilc, filter_bgc_soilc, &
          atm2lnd_inst, wateratm2lndbulk_inst, &
          soilbiogeochem_nitrogenflux_inst, cnveg_carbonstate_inst, &
          soilbiogeochem_nitrogenstate_inst, soilbiogeochem_carbonflux_inst, &
@@ -326,7 +326,7 @@ contains
   
 
     if (use_crop) then
-       call CNNFert(bounds, num_bgc_soilc,filter_bgc_soilc, &
+       call CNNFert(bounds, num_bgc_soilc,filter_bgc_soilc, num_pcropp, filter_pcropp,&
             cnveg_nitrogenflux_inst, soilbiogeochem_nitrogenflux_inst)
 
        if (.not. use_fun) then  ! if FUN is active, then soy fixation handled by FUN
@@ -412,6 +412,7 @@ contains
                crop_inst, canopystate_inst, soilstate_inst, dgvs_inst, &
                cnveg_state_inst, cnveg_carbonstate_inst, cnveg_carbonflux_inst, &
                cnveg_nitrogenstate_inst, cnveg_nitrogenflux_inst, &
+               soilbiogeochem_nitrogenstate_inst, &
                c13_cnveg_carbonstate_inst, c14_cnveg_carbonstate_inst, &
                leaf_prof_patch=soilbiogeochem_state_inst%leaf_prof_patch(begp:endp,1:nlevdecomp_full), &
                froot_prof_patch=soilbiogeochem_state_inst%froot_prof_patch(begp:endp,1:nlevdecomp_full), &
@@ -542,6 +543,7 @@ contains
                crop_inst, canopystate_inst, soilstate_inst, dgvs_inst, &
                cnveg_state_inst, cnveg_carbonstate_inst, cnveg_carbonflux_inst, &
                cnveg_nitrogenstate_inst, cnveg_nitrogenflux_inst, &
+               soilbiogeochem_nitrogenstate_inst, &
                c13_cnveg_carbonstate_inst, c14_cnveg_carbonstate_inst, &
                leaf_prof_patch=soilbiogeochem_state_inst%leaf_prof_patch(begp:endp,1:nlevdecomp_full), &
                froot_prof_patch=soilbiogeochem_state_inst%froot_prof_patch(begp:endp,1:nlevdecomp_full), &

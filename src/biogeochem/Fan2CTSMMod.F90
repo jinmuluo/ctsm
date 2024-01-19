@@ -197,7 +197,6 @@ contains
        waterstatebulk_inst, soilstate_inst, temperature_inst, &
        waterfluxbulk_inst, frictionvel_inst)
     use clm_time_manager, only: get_step_size, get_curr_date, get_curr_calday, get_nstep
-    use clm_varpar, only: max_patch_per_col
     use LandunitType, only: lun
     use shr_sys_mod, only : shr_sys_flush
     use GridcellType, only: grc
@@ -315,7 +314,7 @@ contains
 
     ! Convert the patch fertilizer application (from crop model) to column flux:
     call p2c(bounds, num_soilc, filter_soilc, &
-         cnv_nf%synthfert_patch(bounds%begp:bounds%endp), &
+         cnv_nf%fert_patch(bounds%begp:bounds%endp), &
          nf%fert_n_appl_col(bounds%begc:bounds%endc))
     
     if (do_balance_checks) then

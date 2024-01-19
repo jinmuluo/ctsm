@@ -131,8 +131,8 @@ contains
 
       ! Upward of NH4+ diffusion to FAN!! 
       if (use_fan .and. use_nitrif_denitrif .and. use_upward_diffusion) then
-         do fc = 1, num_soilc
-            c = filter_soilc(fc)
+         do fc = 1, num_bgc_soilc
+            c = filter_bgc_soilc(fc)
             ! nh4 vertial pool is in gN/m3 per layer -> gN/m2 column
              nh4_totn_term = 0.0_r8
              do j =1, nlevdecomp

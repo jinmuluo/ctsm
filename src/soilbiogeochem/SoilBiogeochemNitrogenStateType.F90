@@ -1632,7 +1632,10 @@ contains
            this%sminn_col(c)   + &
            this%ntrunc_col(c)  + &
            totvegn_col
-      
+
+      ! add the fan n to totn pool
+      this%totn_col(c) = this%totn_col(c) + this%fan_totn_col(c)
+ 
    end do
    
  end subroutine Summary

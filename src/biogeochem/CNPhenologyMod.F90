@@ -1930,7 +1930,7 @@ contains
          leafn_xfer        =>    cnveg_nitrogenstate_inst%leafn_xfer_patch     , & ! Output: [real(r8) (:) ]  (gN/m2)   leaf N transfer                           
          crop_seedn_to_leaf =>   cnveg_nitrogenflux_inst%crop_seedn_to_leaf_patch, & ! Output: [real(r8) (:) ]  (gN/m2/s) seed source to leaf
          cphase            =>    crop_inst%cphase_patch                        , & ! Output: [real(r8) (:)]   phenology phase
-         synthfert         =>    cnveg_nitrogenflux_inst%synthfert_patch       , & ! Output: [real(r8) (:) ]  (gN/m2/s) fertilizer applied each timestep 
+         synthfert         =>    cnveg_nitrogenflux_inst%fert_patch            , & ! Output: [real(r8) (:) ]  (gN/m2/s) fertilizer applied each timestep 
          manure            =>    cnveg_nitrogenflux_inst%manure_patch            & ! Output: [real(r8) (:) ]  (gN/m2/s) manure applied each timestep 
          )
 

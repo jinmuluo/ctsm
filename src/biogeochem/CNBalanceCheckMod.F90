@@ -616,10 +616,12 @@ contains
          col_ninputs_partial(c) = col_ninputs(c)
          
          ! calculate total column-level outputs
+      
+         col_noutputs(c) = 0.0_r8
 
          if( .not.col%is_fates(c) ) then
             
-            col_noutputs(c) = col_fire_nloss(c) + gru_conv_nflux(c)
+            col_noutputs(c) = col_noutputs(c) + col_fire_nloss(c) + gru_conv_nflux(c)
 
             ! Fluxes to product pools are included in column-level outputs: the product
             ! pools are not included in totcoln, so are outside the system with respect to
@@ -633,7 +635,7 @@ contains
          else
             
             ! If we are using fates, remove plant uptake
-            col_noutputs(c) =  sminn_to_plant(c)
+            col_noutputs(c) = col_noutputs(c) + sminn_to_plant(c)
             
          end if
 

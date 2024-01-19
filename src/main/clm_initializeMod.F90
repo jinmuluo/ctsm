@@ -134,7 +134,7 @@ contains
     use clm_varctl                    , only : fsurdat
     use clm_varctl                    , only : finidat, finidat_interp_source, finidat_interp_dest, fsurdat
     use clm_varctl                    , only : use_cn, use_fates, use_fates_luh
-    use clm_varctl                    , only : use_crop, ndep_from_cpl, fates_spitfire_mode
+    use clm_varctl                    , only : use_crop, ndep_from_cpl, fates_spitfire_mode, use_fan
     use clm_varorb                    , only : eccen, mvelpp, lambm0, obliqr
     use clm_varctl                    , only : use_cropcal_streams
     use landunit_varcon               , only : landunit_varcon_init, max_lunit, numurbl
