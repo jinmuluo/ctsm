@@ -186,7 +186,7 @@ contains
     use subgridAveMod    , only: p2c
     use perf_mod         , only : t_startf, t_stopf
     use SoilBiogeochemDecompCascadeConType , only : decomp_cascade_con,  mimics_decomp, decomp_method
-    use Fan3Mod          , only:  use_canopy_reduction, nitrif_n2o_loss_frac_parton
+    use Fan3Mod          , only:  use_canopy_reduction 
     !
     ! !ARGUMENTS:
     type(bounds_type)                       , intent(in)    :: bounds
@@ -727,7 +727,7 @@ contains
                end if
 
                ! n2o emissions: n2o from nitr is const fraction, n2o from denitr is calculated in nitrif_denitrif
-               f_n2o_nit_vr(c,j) = f_nit_vr(c,j) * nitrif_n2o_loss_frac_parton
+               f_n2o_nit_vr(c,j) = f_nit_vr(c,j) * nitrif_n2o_loss_frac
                f_n2o_denit_vr(c,j) = f_denit_vr(c,j) / (1._r8 + ratio_nox_n2o(c,j) + n2_n2o_ratio_denit_vr(c,j))
                f_n2_denit_vr(c, j) = n2_n2o_ratio_denit_vr(c,j) * f_n2o_denit_vr(c,j) 
  

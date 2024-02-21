@@ -18,7 +18,7 @@ module SoilBiogeochemNStateUpdate1Mod
   use CNSharedParamsMod                  , only : use_fun
   use ColumnType                         , only : col 
   use abortutils                         , only : endrun
-  use Fan3Mod                            , only : use_canopy_reduction,  nitrif_n2o_loss_frac_parton
+  use Fan3Mod                            , only : use_canopy_reduction
   use Fan3Mod                            , only : use_upward_diffusion
   !
   implicit none
@@ -288,7 +288,7 @@ contains
                ns%smin_nh4_vr_col(c,j) = ns%smin_nh4_vr_col(c,j) - nf%f_nit_vr_col(c,j) * dt
 
                ns%smin_no3_vr_col(c,j) = ns%smin_no3_vr_col(c,j) + nf%f_nit_vr_col(c,j) * dt &
-                    * ( 1._r8 - nitrif_n2o_loss_frac_parton * (1 + nf%ratio_nox_n2o_col(c,j)) )
+                    * ( 1._r8 - nitrif_n2o_loss_frac * (1 + nf%ratio_nox_n2o_col(c,j)) )
 
                ! Account for denitrification fluxes
                ns%smin_no3_vr_col(c,j) = ns%smin_no3_vr_col(c,j) - nf%f_denit_vr_col(c,j) * dt

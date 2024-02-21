@@ -21,7 +21,8 @@ use spmdMod                          , only : masterproc
 use abortutils                       , only : endrun
 use clm_time_manager                 , only : get_step_size_real
 use clm_time_manager                 , only : get_curr_date
-use clm_time_manager    , only : get_nstep_since_startup_or_lastDA_restart_or_pause
+use clm_time_manager                 , only : get_nstep_since_startup_or_lastDA_restart_or_pause
+use clm_varcon                       , only : nitrif_n2o_loss_frac
 
 !
 implicit none
@@ -144,8 +145,8 @@ subroutine eval_nitrification_n2o_nox(nitrify_flux, theta, thetasat, sg_diff, &
  
   RNOx = 15.2_r8 + 35.5_r8*atan(0.68_r8*pi*(10.0_r8*sg_diff - 1.86_r8)) / pi
   
-  no3_flux = nitrify_flux / (1_r8 + nitrif_n2o_loss_frac_parton + RNOx*nitrif_n2o_loss_frac_parton)
-  n2o_n = nitrif_n2o_loss_frac_parton * no3_flux
+  no3_flux = nitrify_flux / (1_r8 + nitrif_n2o_loss_frac + RNOx*nitrif_n2o_loss_frac)
+  n2o_n = nitrif_n2o_loss_frac * no3_flux
   nox_n = RNOx * n2o_n
 
 end subroutine eval_nitrification_n2o_nox
