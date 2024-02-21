@@ -405,7 +405,11 @@ contains
             ! NOTE that the coefficients for oxygen are used here; it may be more appropriate to use
             ! coefficients for the gases being dealt with in this subroutine.
             D0 = (d_con_g(2,1) + d_con_g(2,2)*t_soisno(c,j)) * 1.e-4_r8
-            diffus_S(c,j) = diffus(c,j)
+
+            if (use_fan) then
+               diffus_S(c,j) = diffus(c,j)
+            end if
+
             diffus(c,j) = diffus(c,j) * D0
 
             ! ratio function (figure 7c)
