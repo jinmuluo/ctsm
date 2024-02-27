@@ -581,6 +581,7 @@ contains
          fracice           =>    soilhydrology_inst%fracice_col     , & ! Input:  [real(r8) (:,:) ]  fractional impermeability (-)                   
          icefrac           =>    soilhydrology_inst%icefrac_col     , & ! Input:  [real(r8) (:,:) ]  fraction of ice                                 
          hkdepth           =>    soilhydrology_inst%hkdepth_col     , & ! Input:  [real(r8) (:)   ]  decay factor (m)                                  
+         qout_col          =>    soilhydrology_inst%qout_col        , & ! Output: [real(r8) (:)   ]  soil water out of the bottom at 1.20 meters, mm h2o/s 
 
          smpmin            =>    soilstate_inst%smpmin_col          , & ! Input:  [real(r8) (:)   ]  restriction for min of soil potential (mm)        
          watsat            =>    soilstate_inst%watsat_col          , & ! Input:  [real(r8) (:,:) ]  volumetric soil water at saturation (porosity)  
@@ -830,7 +831,11 @@ contains
             amx(c,j)    = -dqidw0(c,j)
             bmx(c,j)    =  dzmm(c,j)/dtime - dqidw1(c,j) + dqodw1(c,j)
             cmx(c,j)    =  dqodw2(c,j)
-            
+           
+            if (j==9) then
+               qout_col(c) = qout(c,j)
+            end if
+ 
          end do
       end do
 
@@ -1176,6 +1181,7 @@ contains
 
          qcharge           =>    soilhydrology_inst%qcharge_col     , & ! Input:  [real(r8) (:)   ]  aquifer recharge rate (mm/s)                      
          zwt               =>    soilhydrology_inst%zwt_col         , & ! Input:  [real(r8) (:)   ]  water table depth (m)                             
+         qout_col          =>    soilhydrology_inst%qout_col        , & ! Output: [real(r8) (:)   ]  soil water out of the bottom at 1.200 meters, mm h2o/s
 
          smp_l             =>    soilstate_inst%smp_l_col           , & ! Input:  [real(r8) (:,:) ]  soil matrix potential [mm]                      
          hk_l              =>    soilstate_inst%hk_l_col            , & ! Input:  [real(r8) (:,:) ]  hydraulic conductivity (mm/s)                   
@@ -1423,6 +1429,9 @@ contains
                !      call endrun(subname // ':: negative soil moisture values found!')
             endif
          end do
+
+
+         qout_col(c) = qout(c, 9)
 
       end do  ! spatial loop
 
