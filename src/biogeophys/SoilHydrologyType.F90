@@ -201,7 +201,7 @@ contains
     this%qout_col(begc:endc) = spval
     call hist_addfld1d (fname="QOUT", units='mm h2o/s', &
          avgflag='A', long_name='flux of water out of soil layer (1.20 meters)', &
-         ptr_col=this%qout_col, default='inactive')
+         ptr_col=this%qout_col) 
 
   end subroutine InitHistory
 
