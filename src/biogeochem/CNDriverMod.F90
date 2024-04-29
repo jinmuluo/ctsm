@@ -45,6 +45,7 @@ module CNDriverMod
   use SoilWaterRetentionCurveMod      , only : soil_water_retention_curve_type
   use CLMFatesInterfaceMod            , only : hlm_fates_interface_type
   use CropReprPoolsMod                , only : nrepr
+  use SoilHydrologyType               , only: soilhydrology_type
   !
   ! !PUBLIC TYPES:
   implicit none
@@ -106,7 +107,7 @@ contains
        wateratm2lndbulk_inst, canopystate_inst, soilstate_inst, temperature_inst,          &
        soil_water_retention_curve, crop_inst, ch4_inst,            &
        dgvs_inst, photosyns_inst, saturated_excess_runoff_inst, energyflux_inst,                   &
-       nutrient_competition_method, cnfire_method, dribble_crophrv_xsmrpool_2atm, frictionvel_inst)
+       nutrient_competition_method, cnfire_method, dribble_crophrv_xsmrpool_2atm, frictionvel_inst, soilhydrology_inst)
     !
     ! !DESCRIPTION:
     ! The core CN code is executed here. Calculates fluxes for maintenance
@@ -150,6 +151,7 @@ contains
     use NutrientCompetitionMethodMod      , only: nutrient_competition_method_type
     use CNRootDynMod                      , only: CNRootDyn
     use CNPrecisionControlMod             , only: CNPrecisionControl
+    use SoilNitrogenMovementMod           , only: SoilNitrogenMovement, use_nvmovement
     !
     ! !ARGUMENTS:
     type(bounds_type)                       , intent(in)    :: bounds  
@@ -199,6 +201,7 @@ contains
     type(wateratm2lndbulk_type)                    , intent(inout)    :: wateratm2lndbulk_inst
     type(canopystate_type)                  , intent(inout)    :: canopystate_inst
     type(soilstate_type)                    , intent(inout) :: soilstate_inst
+    type(soilhydrology_type)                , intent(in)    :: soilhydrology_inst
     type(temperature_type)                  , intent(inout) :: temperature_inst
     class(soil_water_retention_curve_type)  , intent(in)    :: soil_water_retention_curve
     type(crop_type)                         , intent(inout) :: crop_inst
@@ -508,6 +511,17 @@ contains
     call t_stopf('calc_plant_nutrient_competition')
 
     call t_stopf('CNDecompAlloc')
+
+
+    ! -------------------------------------------
+    ! soil nitrate fast aqueous movement
+    ! -------------------------------------------
+    if (use_nitrif_denitrif .and. use_nvmovement) then
+       call t_startf('SoilNitrogenMovementMod')
+       call SoilNitrogenMovement(bounds, num_bgc_soilc, filter_bgc_soilc, waterstatebulk_inst, &
+            soilstate_inst, soilhydrology_inst, soilbiogeochem_nitrogenflux_inst, soilbiogeochem_nitrogenstate_inst)
+       call t_stopf('SoilNitrogenMovementMod')
+    end if
 
     !--------------------------------------------
     ! Calculate litter and soil decomposition rate
