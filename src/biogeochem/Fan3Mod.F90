@@ -55,7 +55,6 @@ logical, parameter, private :: v2log = .FALSE.
 logical, parameter, public :: use_canopy_reduction = .TRUE.
 logical, parameter, public :: use_upward_diffusion = .TRUE.
 !
-real(r8), public, parameter :: nitrif_n2o_loss_frac_parton = 0.02  !ratio of n2o/nit, unitless
 real(r8), private, parameter :: skip_size = 3600.0_r8   ! Time steps to skip the balance check at startup (sec)
 integer,  private            :: skip_steps = -999       ! Number of time steps to skip the balance check for
 
@@ -137,16 +136,18 @@ subroutine eval_nitrification_n2o_nox(nitrify_flux, theta, thetasat, sg_diff, &
   real(r8), intent(out) :: nox_n(:)                        ! nox production rate, gN/m2/s
   real(r8), intent(out) :: RNOx                            ! ratio of no/n2o (Parton et al.,1996, 2001), unitless
 
-  real(r8) :: sg_diff_fan
+  real(r8) :: sg_diff_fan, wfps, nitrif_lost_as_n2o 
   real(r8), parameter :: pi = 3.1415926_r8      
 
 
   sg_diff_fan = eval_sgd(theta, thetasat)
  
   RNOx = 15.2_r8 + 35.5_r8*atan(0.68_r8*pi*(10.0_r8*sg_diff - 1.86_r8)) / pi
-  
-  no3_flux = nitrify_flux / (1_r8 + nitrif_n2o_loss_frac + RNOx*nitrif_n2o_loss_frac)
-  n2o_n = nitrif_n2o_loss_frac * no3_flux
+  wfps = max(min(theta/thetasat, 1._r8), 0._r8)
+  nitrif_lost_as_n2o = 0.0006 + (0.0043 - 0.0006)/( 1 + exp( -( -6.27 + 24.71*wfps)) ) 
+  nitrif_lost_as_n2o = min(max(0.0006, nitrif_lost_as_n2o), 0.0043) 
+  no3_flux = nitrify_flux / (1_r8 + nitrif_lost_as_n2o + RNOx*nitrif_lost_as_n2o)
+  n2o_n = nitrif_lost_as_n2o * no3_flux
   nox_n = RNOx * n2o_n
 
 end subroutine eval_nitrification_n2o_nox

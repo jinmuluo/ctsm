@@ -288,7 +288,7 @@ contains
                ns%smin_nh4_vr_col(c,j) = ns%smin_nh4_vr_col(c,j) - nf%f_nit_vr_col(c,j) * dt
 
                ns%smin_no3_vr_col(c,j) = ns%smin_no3_vr_col(c,j) + nf%f_nit_vr_col(c,j) * dt &
-                    * ( 1._r8 - nitrif_n2o_loss_frac * (1 + nf%ratio_nox_n2o_col(c,j)) )
+                    * ( 1._r8 - nf%nitrif_lost_as_n2o_col(c,j) * (1 + nf%ratio_nox_n2o_col(c,j)) )
 
                ! Account for denitrification fluxes
                ns%smin_no3_vr_col(c,j) = ns%smin_no3_vr_col(c,j) - nf%f_denit_vr_col(c,j) * dt

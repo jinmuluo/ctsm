@@ -280,6 +280,7 @@ contains
          f_n2_denit_vr                => soilbiogeochem_nitrogenflux_inst%f_n2_denit_vr_col            , & ! Output: [real(r8] (:,:) ]  flux of N2 from denintrification [gN/m3/s]        
          f_canopy_to_soil_vr          => soilbiogeochem_nitrogenflux_inst%f_canopy_to_soil_vr_col      , & ! Output: [real(r8) (:,:) ]  NOx reduced by canopy, back to soil NH4+ [gN/m3/s]
          ratio_nox_n2o                => soilbiogeochem_nitrogenflux_inst%ratio_nox_n2o_col            , & ! Input:  [real(r8) (:,:) ]
+         nitrif_lost_as_n2o           => soilbiogeochem_nitrogenflux_inst%nitrif_lost_as_n2o_col       , & ! Input:  [real(r8) (:,:) ]  fraction of nitrification flux lost as n2o, unitless 
          CR                           => soilbiogeochem_nitrogenstate_inst%CR_col                      , & ! Input:  [real(r8) (:)   ]  canopy reduction coefficience, unitless     
          supplement_to_sminn_vr       => soilbiogeochem_nitrogenflux_inst%supplement_to_sminn_vr_col   , & ! Output: [real(r8) (:,:) ]                                        
          sminn_to_plant_vr            => soilbiogeochem_nitrogenflux_inst%sminn_to_plant_vr_col        , & ! Output: [real(r8) (:,:) ]                                        
@@ -727,7 +728,7 @@ contains
                end if
 
                ! n2o emissions: n2o from nitr is const fraction, n2o from denitr is calculated in nitrif_denitrif
-               f_n2o_nit_vr(c,j) = f_nit_vr(c,j) * nitrif_n2o_loss_frac
+               f_n2o_nit_vr(c,j) = f_nit_vr(c,j) * nitrif_lost_as_n2o(c,j) 
                f_n2o_denit_vr(c,j) = f_denit_vr(c,j) / (1._r8 + ratio_nox_n2o(c,j) + n2_n2o_ratio_denit_vr(c,j))
                f_n2_denit_vr(c, j) = n2_n2o_ratio_denit_vr(c,j) * f_n2o_denit_vr(c,j) 
  

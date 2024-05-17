@@ -182,6 +182,7 @@ module SoilBiogeochemNitrogenFluxType
      real(r8), pointer :: soil_co2_prod_col                         (:,:)
      real(r8), pointer :: fr_WFPS_col                               (:,:)
      real(r8), pointer :: ratio_nox_n2o_col                         (:,:)
+     real(r8), pointer :: nitrif_lost_as_n2o_col                    (:,:)   ! fraction os nitrified N lost as N2O (unitless)
 
      real(r8), pointer :: r_psi_col                                 (:,:)
      real(r8), pointer :: anaerobic_frac_col                        (:,:)
@@ -407,6 +408,7 @@ contains
     allocate(this%soil_co2_prod_col                 (begc:endc,1:nlevdecomp_full)) ; this%soil_co2_prod_col          (:,:) = nan
     allocate(this%fr_WFPS_col                       (begc:endc,1:nlevdecomp_full)) ; this%fr_WFPS_col                (:,:) = spval
     allocate(this%ratio_nox_n2o_col                 (begc:endc,1:nlevdecomp_full)) ; this%ratio_nox_n2o_col          (:,:) = spval     
+    allocate(this%nitrif_lost_as_n2o_col            (begc:endc,1:nlevdecomp_full)) ; this%nitrif_lost_as_n2o_col     (:,:) = spval
 
     allocate(this%fmax_denit_carbonsubstrate_vr_col (begc:endc,1:nlevdecomp_full)) ; 
     this%fmax_denit_carbonsubstrate_vr_col (:,:) = nan
@@ -1213,6 +1215,13 @@ contains
             avgflag='A', long_name='ratio_nox_n2o', &
             ptr_col=this%ratio_nox_n2o_col, default='inactive')
     end if 
+ 
+    if (use_nitrif_denitrif) then
+       this%nitrif_lost_as_n2o_col(begc:endc,:) = spval
+       call hist_addfld_decomp (fname='nitrif_lost_as_n2o', units='fraction', type2d='levdcmp', &
+            avgflag='A', long_name='nitrif_lost_as_n2o', &
+            ptr_col=this%nitrif_lost_as_n2o_col, default='inactive')
+    end if
 
     if (use_nitrif_denitrif) then
        this%soil_bulkdensity_col(begc:endc,:) = spval
@@ -1461,7 +1470,7 @@ contains
              this%fr_WFPS_col(i,j)                       = value_column
              this%soil_bulkdensity_col(i,j)              = value_column
              this%ratio_nox_n2o_col(i,j)                 = value_column
-
+             this%nitrif_lost_as_n2o_col(i,j)            = value_column
              this%r_psi_col(i,j)                         = value_column
              this%anaerobic_frac_col(i,j)                = value_column
           end if

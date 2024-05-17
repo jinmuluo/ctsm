@@ -246,7 +246,8 @@ contains
 
          pot_f_denit_vr                =>    soilbiogeochem_nitrogenflux_inst%pot_f_denit_vr_col                , & ! Output:  [real(r8) (:,:) ]  (gN/m3/s) potential soil denitrification flux   
          n2_n2o_ratio_denit_vr         =>    soilbiogeochem_nitrogenflux_inst%n2_n2o_ratio_denit_vr_col         , & ! Output:  [real(r8) (:,:) ]  ratio of N2 to N2O production by denitrification [gN/gN]
-         ratio_nox_n2o                 =>    soilbiogeochem_nitrogenflux_inst%ratio_nox_n2o_col                   &
+         ratio_nox_n2o                 =>    soilbiogeochem_nitrogenflux_inst%ratio_nox_n2o_col                 , & ! Output:  [real(r8) (:,:) ]  unitless
+         nitrif_lost_as_n2o            =>    soilbiogeochem_nitrogenflux_inst%nitrif_lost_as_n2o_col              & ! Output:  [real(r8) (:,:) ]  unitless
          )           
 
       surface_tension_water = params_inst%surface_tension_water
@@ -426,7 +427,11 @@ contains
 
             ! final ratio expression 
             n2_n2o_ratio_denit_vr(c,j) = max(0.16_r8*ratio_k1(c,j), ratio_k1(c,j)*exp(-0.8_r8 * ratio_no3_co2(c,j))) * fr_WFPS(c,j)
-         
+        
+            ! nitrified flux lost as n2o (Gurung et al., 2021), equation 1 and table 3
+            nitrif_lost_as_n2o(c,j) = 0.0006 + (0.0043 - 0.0006)/( 1 + exp( -( 6.27 + 24.71*0.01*wfps_vr(c,j)) ) ) 
+            nitrif_lost_as_n2o(c,j) = min(max(0.0006, nitrif_lost_as_n2o(c,j)), 0.0043) 
+
          end do
 
       end do
