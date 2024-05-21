@@ -493,7 +493,7 @@ contains
                ns%S_diffus_col(c, 1), fan3fluxes(no3flux_id, 1:num_cls_grz), &
                fan3fluxes(n2o_n_id, 1:num_cls_grz), fan3fluxes(nox_n_id, 1:num_cls_grz), RNOx)
 
-          call eval_denitrification_n2o_nox(nitratepools(1:num_cls_grz), theta, thetasat, RNOx, &
+          call eval_denitrification_n2o_nox(nitratepools(1:num_cls_grz), theta, thetasat, 0.0_r8, &
                ns%S_fmax_denit_carbonsubstrate_vr_col(c, 1), ns%S_anaerobic_frac_col(c, 1), &
                ns%S_diffus_col(c, 1), ns%S_soil_co2_prod_col(c, 1), & 
                fan3fluxes(n2o_dn_id, 1:num_cls_grz), fan3fluxes(nox_dn_id, 1:num_cls_grz), & 
@@ -618,7 +618,7 @@ contains
                ns%S_diffus_col(c, 1), fan3fluxes(no3flux_id, 1:num_cls_slr), &
                fan3fluxes(n2o_n_id, 1:num_cls_slr), fan3fluxes(nox_n_id, 1:num_cls_slr), RNOx)
 
-          call eval_denitrification_n2o_nox(nitratepools(1:num_cls_slr), theta, thetasat, RNOx, &
+          call eval_denitrification_n2o_nox(nitratepools(1:num_cls_slr), theta, thetasat, 0.0_r8, &
                ns%S_fmax_denit_carbonsubstrate_vr_col(c, 1), ns%S_anaerobic_frac_col(c, 1), &
                ns%S_diffus_col(c, 1), ns%S_soil_co2_prod_col(c, 1), &
                fan3fluxes(n2o_dn_id, 1:num_cls_slr), fan3fluxes(nox_dn_id, 1:num_cls_slr), &
@@ -767,7 +767,7 @@ contains
                ns%S_diffus_col(c, 1), fan3fluxes(no3flux_id, 1:num_cls_fert), &
                fan3fluxes(n2o_n_id, 1:num_cls_fert), fan3fluxes(nox_n_id, 1:num_cls_fert), RNOx)
 
-          call eval_denitrification_n2o_nox(nitratepools(1:num_cls_fert), theta, thetasat, RNOx, &
+          call eval_denitrification_n2o_nox(nitratepools(1:num_cls_fert), theta, thetasat, 0.0_r8, &
                ns%S_fmax_denit_carbonsubstrate_vr_col(c, 1), ns%S_anaerobic_frac_col(c, 1), &
                ns%S_diffus_col(c, 1), ns%S_soil_co2_prod_col(c, 1), &
                fan3fluxes(n2o_dn_id, 1:num_cls_fert), fan3fluxes(nox_dn_id, 1:num_cls_fert), &
@@ -805,7 +805,7 @@ contains
                ns%S_diffus_col(c, 1), fan3fluxes(no3flux_id, 1:1), &
                fan3fluxes(n2o_n_id, 1:1), fan3fluxes(nox_n_id, 1:1), RNOx)
 
-          call eval_denitrification_n2o_nox(nitratepools(4:4), theta, thetasat, RNOx, &
+          call eval_denitrification_n2o_nox(nitratepools(4:4), theta, thetasat, 0.0_r8, &
                ns%S_fmax_denit_carbonsubstrate_vr_col(c, 1), ns%S_anaerobic_frac_col(c, 1), &
                ns%S_diffus_col(c, 1), ns%S_soil_co2_prod_col(c, 1), &
                fan3fluxes(n2o_dn_id, 1:1), fan3fluxes(nox_dn_id, 1:1), &

@@ -9,6 +9,7 @@ list(APPEND clm_sources
   EnergyFluxType.F90
   FrictionVelocityMod.F90
   GlacierSurfaceMassBalanceMod.F90
+  HillslopeHydrologyUtilsMod.F90
   HumanIndexMod.F90
   InfiltrationExcessRunoffMod.F90
   IrrigationMod.F90

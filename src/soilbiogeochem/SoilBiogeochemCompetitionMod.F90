@@ -729,18 +729,17 @@ contains
 
                ! n2o emissions: n2o from nitr is const fraction, n2o from denitr is calculated in nitrif_denitrif
                f_n2o_nit_vr(c,j) = f_nit_vr(c,j) * nitrif_lost_as_n2o(c,j) 
-               f_n2o_denit_vr(c,j) = f_denit_vr(c,j) / (1._r8 + ratio_nox_n2o(c,j) + n2_n2o_ratio_denit_vr(c,j))
+               f_n2o_denit_vr(c,j) = f_denit_vr(c,j) / (1._r8 + n2_n2o_ratio_denit_vr(c,j))
                f_n2_denit_vr(c, j) = n2_n2o_ratio_denit_vr(c,j) * f_n2o_denit_vr(c,j) 
  
                ! nox emissions after canopy capture
                if (use_fan .and. use_canopy_reduction) then
                   f_nox_nit_vr(c,j) = ratio_nox_n2o(c,j) * f_n2o_nit_vr(c,j) * CR(c)
-                  f_nox_denit_vr(c,j) = ratio_nox_n2o(c,j) * f_n2o_denit_vr(c,j) * CR(c)
-                  f_canopy_to_soil_vr(c,j) = (f_n2o_nit_vr(c,j) + f_n2o_denit_vr(c,j)) * &
-                                            ratio_nox_n2o(c,j) * (1 - CR(c)) 
+                  f_nox_denit_vr(c,j) = 0.0_r8 * f_n2o_denit_vr(c,j) * CR(c)
+                  f_canopy_to_soil_vr(c,j) = (f_n2o_nit_vr(c,j) ) * ratio_nox_n2o(c,j) * (1 - CR(c)) 
                else
                   f_nox_nit_vr(c,j) = ratio_nox_n2o(c,j) * f_n2o_nit_vr(c,j) 
-                  f_nox_denit_vr(c,j) = ratio_nox_n2o(c,j) * f_n2o_denit_vr(c,j)
+                  f_nox_denit_vr(c,j) = 0.0_r8 * f_n2o_denit_vr(c,j)
                   f_canopy_to_soil_vr(c,j) = 0.0_r8 
                end if 
 
