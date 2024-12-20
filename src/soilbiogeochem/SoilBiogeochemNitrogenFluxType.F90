@@ -181,6 +181,7 @@ module SoilBiogeochemNitrogenFluxType
      real(r8), pointer :: ratio_no3_co2_col                         (:,:)
      real(r8), pointer :: soil_co2_prod_col                         (:,:)
      real(r8), pointer :: fr_WFPS_col                               (:,:)
+     real(r8), pointer :: fd_WFPS_col                               (:,:)
      real(r8), pointer :: ratio_nox_n2o_col                         (:,:)
      real(r8), pointer :: nitrif_lost_as_n2o_col                    (:,:)   ! fraction os nitrified N lost as N2O (unitless)
 
@@ -407,6 +408,7 @@ contains
     allocate(this%ratio_no3_co2_col                 (begc:endc,1:nlevdecomp_full)) ; this%ratio_no3_co2_col          (:,:) = spval
     allocate(this%soil_co2_prod_col                 (begc:endc,1:nlevdecomp_full)) ; this%soil_co2_prod_col          (:,:) = nan
     allocate(this%fr_WFPS_col                       (begc:endc,1:nlevdecomp_full)) ; this%fr_WFPS_col                (:,:) = spval
+    allocate(this%fd_WFPS_col                       (begc:endc,1:nlevdecomp_full)) ; this%fd_WFPS_col                (:,:) = spval
     allocate(this%ratio_nox_n2o_col                 (begc:endc,1:nlevdecomp_full)) ; this%ratio_nox_n2o_col          (:,:) = spval     
     allocate(this%nitrif_lost_as_n2o_col            (begc:endc,1:nlevdecomp_full)) ; this%nitrif_lost_as_n2o_col     (:,:) = spval
 
@@ -1210,6 +1212,13 @@ contains
     end if
 
     if (use_nitrif_denitrif) then
+       this%fd_WFPS_col(begc:endc,:) = spval
+       call hist_addfld_decomp (fname='fd_WFPS', units='fraction', type2d='levdcmp', &
+            avgflag='A', long_name='fd_WFPS', &
+            ptr_col=this%fd_WFPS_col, default='inactive')
+    end if
+
+    if (use_nitrif_denitrif) then
        this%ratio_nox_n2o_col(begc:endc,:) = spval
        call hist_addfld_decomp (fname='ratio_nox_n2o', units='ratio', type2d='levdcmp', &
             avgflag='A', long_name='ratio_nox_n2o', &
@@ -1468,6 +1477,7 @@ contains
              this%ratio_no3_co2_col(i,j)                 = value_column
              this%soil_co2_prod_col(i,j)                 = value_column
              this%fr_WFPS_col(i,j)                       = value_column
+             this%fd_WFPS_col(i,j)                       = value_column
              this%soil_bulkdensity_col(i,j)              = value_column
              this%ratio_nox_n2o_col(i,j)                 = value_column
              this%nitrif_lost_as_n2o_col(i,j)            = value_column

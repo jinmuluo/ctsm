@@ -12,6 +12,7 @@ module SoilBiogeochemNitrifDenitrifMod
   use clm_varpar                      , only : nlevdecomp
   use clm_varcon                      , only : rpi, grav
   use clm_varcon                      , only : d_con_g, d_con_w, secspday
+  use clm_varcon                      , only : zsoi
   use clm_varctl                      , only : use_lch4, use_fates
   use clm_varctl                      , only : use_fan, iulog
   use abortutils                      , only : endrun
@@ -184,8 +185,10 @@ contains
     real(r8) :: rho_w  = 1.e3_r8                   ! (kg/m3)
     real(r8) :: r_max
     real(r8) :: r_min(bounds%begc:bounds%endc,1:nlevdecomp)
+    real(r8) :: dft(bounds%begc:bounds%endc)
     real(r8) :: ratio_diffusivity_water_gas(bounds%begc:bounds%endc,1:nlevdecomp)
     real(r8) :: om_frac, diffus_millingtonquirk, diffus_moldrup
+    real(r8) :: inflection_a, m_fc, soilgd
     real(r8) :: anaerobic_frac_sat, r_psi_sat, r_min_sat ! scalar values in sat portion for averaging
     real(r8) :: organic_max              ! organic matter content (kg/m3) where
                                          ! soil is assumed to act like peat
@@ -240,7 +243,8 @@ contains
          ratio_k1                      =>    soilbiogeochem_nitrogenflux_inst%ratio_k1_col                      , & ! Output:  [real(r8) (:,:) ]                                                  
          ratio_no3_co2                 =>    soilbiogeochem_nitrogenflux_inst%ratio_no3_co2_col                 , & ! Output:  [real(r8) (:,:) ]                                                  
          soil_co2_prod                 =>    soilbiogeochem_nitrogenflux_inst%soil_co2_prod_col                 , & ! Output:  [real(r8) (:,:) ]  (ug C / g soil / day)                           
-         fr_WFPS                       =>    soilbiogeochem_nitrogenflux_inst%fr_WFPS_col                       , & ! Output:  [real(r8) (:,:) ]                                                  
+         fr_WFPS                       =>    soilbiogeochem_nitrogenflux_inst%fr_WFPS_col                       , & ! Output:  [real(r8) (:,:) ]                                                 
+         fd_WFPS                       =>    soilbiogeochem_nitrogenflux_inst%fd_WFPS_col                       , & ! Output:  [real(r8) (:,:) ]    
          soil_bulkdensity              =>    soilbiogeochem_nitrogenflux_inst%soil_bulkdensity_col              , & ! Output:  [real(r8) (:,:) ]  (kg soil / m3) bulk density of soil (including water)
          pot_f_nit_vr                  =>    soilbiogeochem_nitrogenflux_inst%pot_f_nit_vr_col                  , & ! Output:  [real(r8) (:,:) ]  (gN/m3/s) potential soil nitrification flux     
 
@@ -302,6 +306,11 @@ contains
                     (om_frac        * diffus_millingtonquirk + &
                     (1._r8-om_frac) * diffus_moldrup ) 
 
+               ! the real time soil gas diffusivity
+               soilgd = &
+                    om_frac        * (max(0._r8, watsat(c,j)-h2osoi_vol(c,j)))**(10._r8/3._r8) / watsat(c,j)**2 + &
+                    (1._r8-om_frac) * (max(0._r8, watsat(c,j)-h2osoi_vol(c,j)))**2 * (max(0._r8, 1._r8 - h2osoi_vol(c,j) / watsat(c,j)))**(3._r8 / bsw(c,j))  
+
                ! calculate anoxic fraction of soils
                ! use rijtema and kroess model after Riley et al., 2000
                ! caclulated r_psi as a function of psi
@@ -325,6 +334,7 @@ contains
                ! otherwise diffusivity will be zeroed out here. EBK CDK 10/18/2011
                anaerobic_frac(c,j) = 0._r8
                diffus(c,j) = 0._r8
+               soilgd = 0._r8
                !call endrun(msg=' ERROR: NITRIF_DENITRIF requires Methane model to be active'//errMsg(sourcefile, __LINE__) )
             end if
 
@@ -353,7 +363,7 @@ contains
             pot_f_nit_vr(c,j)  = pot_f_nit_vr(c,j) * (1._r8 - anaerobic_frac(c,j))
 
             ! emission rate of nox and n2o 
-            ratio_nox_n2o(c,j) = max(0.0_r8, 15.2_r8+35.5_r8*atan(0.68_r8*rpi*(10.0_r8*diffus(c,j) - 1.86_r8))/rpi) 
+            ratio_nox_n2o(c,j) = max(0.0_r8, 15.2_r8+35.5_r8*atan(0.68_r8*rpi*(10.0_r8*soilgd - 1.86_r8))/rpi) 
  
             ! limit to non-frozen soil layers
             if ( t_soisno(c,j) <= SHR_CONST_TKFRZ .and. no_frozen_nitrif_denitrif) then
@@ -384,8 +394,14 @@ contains
             fmax_denit_nitrate_vr(c,j) = (denit_nitrate_coef * smin_no3_massdens_vr(c,j)**denit_nitrate_exp)  &
                  / g_per_m3_sec__to__ug_per_gsoil_day
 
+            ! find the water limiting ratio, fd_WFPS
+            wfps_vr(c,j) = max(min(h2osoi_vol(c,j)/watsat(c, j), 1._r8), 0._r8) * 100._r8
+            m_fc = min(0.113_r8, diffus(c,j)) * -3.05_r8 + 0.36_r8 
+            inflection_a = 9_r8 - m_fc * soil_co2_prod(c,j)  
+            fd_WFPS(c,j) =  max(0.0_r8, min(1.0_r8, 0.5_r8 + atan(0.6_r8*rpi*(0.1_r8*wfps_vr(c,j) - inflection_a))/rpi)) 
+
             ! find limiting denitrification rate
-            f_denit_base_vr(c,j) = max(min(fmax_denit_carbonsubstrate_vr(c,j), fmax_denit_nitrate_vr(c,j)),0._r8) 
+            f_denit_base_vr(c,j) = max(min(fmax_denit_carbonsubstrate_vr(c,j), fmax_denit_nitrate_vr(c,j)),0._r8)
 
             ! limit to non-frozen soil layers
             if ( t_soisno(c,j) <= SHR_CONST_TKFRZ .and. no_frozen_nitrif_denitrif ) then
@@ -408,7 +424,7 @@ contains
             D0 = (d_con_g(2,1) + d_con_g(2,2)*t_soisno(c,j)) * 1.e-4_r8
 
             if (use_fan) then
-               diffus_S(c,j) = diffus(c,j)
+               diffus_S(c,j) = soilgd 
             end if
 
             diffus(c,j) = diffus(c,j) * D0
@@ -422,12 +438,17 @@ contains
             endif
 
             ! total water limitation function (Del Grosso et al., 2000, figure 7a)
-            wfps_vr(c,j) = max(min(h2osoi_vol(c,j)/watsat(c, j), 1._r8), 0._r8) * 100._r8
             fr_WFPS(c,j) = max(0.1_r8, 0.015_r8 * wfps_vr(c,j) - 0.32_r8)
 
-            ! final ratio expression 
-            n2_n2o_ratio_denit_vr(c,j) = max(0.16_r8*ratio_k1(c,j), ratio_k1(c,j)*exp(-0.8_r8 * ratio_no3_co2(c,j))) * fr_WFPS(c,j)
-        
+            ! final ratio expression
+            if ( j == 1) then
+               dft(c) = 1 + max(0.16_r8*ratio_k1(c,j), ratio_k1(c,j)*exp(-0.8_r8 * ratio_no3_co2(c,j))) * fr_WFPS(c,j) 
+            else
+               dft(c) = dft(c) * ( 1 + max(0.16_r8*ratio_k1(c,j), ratio_k1(c,j)*exp(-0.8_r8 * ratio_no3_co2(c,j))) * fr_WFPS(c,j) )  
+            end if  
+
+            n2_n2o_ratio_denit_vr(c,j) = dft(c) - 1._r8  
+  
             ! nitrified flux lost as n2o (Gurung et al., 2021), equation 1 and table 3
             nitrif_lost_as_n2o(c,j) = 0.0006 + (0.0043 - 0.0006)/( 1 + exp( -( 6.27 + 24.71*0.01*wfps_vr(c,j)) ) ) 
             nitrif_lost_as_n2o(c,j) = min(max(0.0006, nitrif_lost_as_n2o(c,j)), 0.0043) 
