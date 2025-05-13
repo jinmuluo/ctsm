@@ -238,6 +238,7 @@ def read_cfg_var_list(config, idealized=True):
 
 
 def modify_optional(
+    *,
     modify_fsurdat,
     idealized,
     include_nonveg,
@@ -254,8 +255,8 @@ def modify_optional(
     """Modify the dataset according to the optional settings"""
 
     # Set fsurdat variables in a rectangle that could be global (default).
-    # Note that the land/ocean mask gets specified in the domain file for
-    # MCT or the ocean mesh files for NUOPC. Here the user may specify
+    # Note that the land/ocean mask gets specified in
+    # the ocean mesh files. Here the user may specify
     # fsurdat variables inside a box but cannot change which points will
     # run as land and which as ocean.
     if idealized:
@@ -571,14 +572,14 @@ def fsurdat_modifier(parser):
     ) = read_cfg_required_basic_opts(config, section, cfg_path)
     # Create ModifyFsurdat object
     modify_fsurdat = ModifyFsurdat.init_from_file(
-        fsurdat_in,
-        lnd_lon_1,
-        lnd_lon_2,
-        lnd_lat_1,
-        lnd_lat_2,
-        landmask_file,
-        lat_dimname,
-        lon_dimname,
+        fsurdat_in=fsurdat_in,
+        lon_1=lnd_lon_1,
+        lon_2=lnd_lon_2,
+        lat_1=lnd_lat_1,
+        lat_2=lnd_lat_2,
+        landmask_file=landmask_file,
+        lat_dimname=lat_dimname,
+        lon_dimname=lon_dimname,
     )
 
     # Read control information about the optional sections
@@ -611,18 +612,18 @@ def fsurdat_modifier(parser):
     # ------------------------------
 
     modify_optional(
-        modify_fsurdat,
-        idealized,
-        include_nonveg,
-        max_sat_area,
-        std_elev,
-        soil_color,
-        dom_pft,
-        evenly_split_cropland,
-        lai,
-        sai,
-        hgt_top,
-        hgt_bot,
+        modify_fsurdat=modify_fsurdat,
+        idealized=idealized,
+        include_nonveg=include_nonveg,
+        max_sat_area=max_sat_area,
+        std_elev=std_elev,
+        soil_color=soil_color,
+        dom_pft=dom_pft,
+        evenly_split_cropland=evenly_split_cropland,
+        lai=lai,
+        sai=sai,
+        hgt_top=hgt_top,
+        hgt_bot=hgt_bot,
     )
     #
     # Handle optional sections
