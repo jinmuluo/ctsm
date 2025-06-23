@@ -140,7 +140,7 @@ contains
     use clm_varctl                    , only : fsurdat, hillslope_file
     use clm_varctl                    , only : finidat, finidat_interp_source, finidat_interp_dest
     use clm_varctl                    , only : use_cn, use_fates, use_fates_luh
-    use clm_varctl                    , only : use_crop, ndep_from_cpl, fates_spitfire_mode
+    use clm_varctl                    , only : use_crop, ndep_from_cpl, fates_spitfire_mode, use_fan
     use clm_varctl                    , only : use_hillslope
     use clm_varorb                    , only : eccen, mvelpp, lambm0, obliqr
     use clm_varctl                    , only : use_cropcal_streams
@@ -171,6 +171,7 @@ contains
     use restFileMod                   , only : restFile_getfile, restFile_open, restFile_close
     use restFileMod                   , only : restFile_read, restFile_write
     use ndepStreamMod                 , only : ndep_init, ndep_interp
+    use FanStreamMod                  , only : fanstream_init, fanstream_interp
     use cropcalStreamMod              , only : cropcal_init, cropcal_interp, cropcal_advance
     use LakeCon                       , only : LakeConInit
     use SatellitePhenologyMod         , only : SatellitePhenologyInit, readAnnualVegetation, interpMonthlyVeg, SatellitePhenology
@@ -651,6 +652,12 @@ contains
           call ndep_interp(bounds_proc, atm2lnd_inst)
        end if
        call t_stopf('init_ndep')
+       if ( use_fan ) then
+          call t_startf('init_ndep2')
+          call fanstream_init(bounds_proc, NLFilename)
+          call fanstream_interp(bounds_proc, atm2lnd_inst)
+          call t_stopf('init_ndep2')
+       end if
     end if
 
     ! Initialize crop calendars

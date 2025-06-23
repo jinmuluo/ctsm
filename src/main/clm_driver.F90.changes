@@ -465,11 +465,10 @@ contains
        call clm_fates%InterpFileInputs(bounds_proc)
     end if
 
-    ! Remove this since the fan stream only has one time sample
-    ! If you stream has more than one time stamp, you should keep this here.
-    if (use_fan) then
-       call fanstream_interp(bounds_proc, atm2lnd_inst)
-    end if
+!   Remove this since the fan stream only has one time sample
+    !if (use_fan) then
+       !call fanstream_interp(bounds_proc, atm2lnd_inst)
+    !end if
 
     ! Get time varying urban data
     call urbantv_inst%urbantv_interp(bounds_proc)

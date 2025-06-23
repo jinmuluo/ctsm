@@ -30,6 +30,18 @@
 <stream_year_last_popdens  cnfireson=".true."   >2016</stream_year_last_popdens>
 <model_year_align_popdens  cnfireson=".true."   >1850</model_year_align_popdens>
 
+<stream_year_first_fan phys="clm4_5" use_cn=".true." ndepsrc="stream" >2010</stream_year_first_fan>
+<stream_year_last_fan  phys="clm4_5" use_cn=".true." ndepsrc="stream" >2010</stream_year_last_fan>
+<model_year_align_fan  phys="clm4_5" use_cn=".true."   >2010</model_year_align_fan>
+
+<stream_year_first_fan phys="clm5_0" use_cn=".true." ndepsrc="stream" >2010</stream_year_first_fan>
+<stream_year_last_fan  phys="clm5_0" use_cn=".true." ndepsrc="stream" >2010</stream_year_last_fan>
+<model_year_align_fan  phys="clm5_0" use_cn=".true."   >2010</model_year_align_fan>
+
+<stream_year_first_fan phys="clm5_1" use_cn=".true." ndepsrc="stream" >2010</stream_year_first_fan>
+<stream_year_last_fan  phys="clm5_1" use_cn=".true." ndepsrc="stream" >2010</stream_year_last_fan>
+<model_year_align_fan  phys="clm5_1" use_cn=".true."   >2010</model_year_align_fan>
+
 <stream_year_first_urbantv >1850</stream_year_first_urbantv>
 <stream_year_last_urbantv  >2106</stream_year_last_urbantv>
 <model_year_align_urbantv  >1850</model_year_align_urbantv>

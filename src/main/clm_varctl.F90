@@ -454,6 +454,12 @@ module clm_varctl
   logical, public :: use_hydrstress = .false. ! true => use plant hydraulic stress calculation
 
   !----------------------------------------------------------
+  ! FAN (Flow of Agricultural Nitrogen) switch
+  !----------------------------------------------------------
+
+  logical, public :: use_fan = .false. ! true => use FAN model
+
+  !----------------------------------------------------------
   ! glacier_mec control variables: default values (may be overwritten by namelist)
   !----------------------------------------------------------
 

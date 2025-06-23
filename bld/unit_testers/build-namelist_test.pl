@@ -279,7 +279,7 @@ my $options = "-co2_ppmv 250 ";
    &cleanup();
 
 print "\n==================================================\n";
-print "Test drydep, fire_emis and megan namelists  \n";
+print "Test drydep, fan, fire_emis and megan namelists  \n";
 print "==================================================\n";
 
 # drydep and megan namelists
@@ -288,7 +288,7 @@ $mode = "-phys $phys";
 &make_config_cache($phys);
 my @mfiles = ( "lnd_in", "drv_flds_in", $tempfile );
 my $mfiles = NMLTest::CompFiles->new( $cwd, @mfiles );
-foreach my $options ( "-drydep", "-megan", "-drydep -megan", "-fire_emis", "-drydep -megan -fire_emis" ) {
+foreach my $options ( "-drydep", "-megan", "-drydep -megan", "-fire_emis", "-drydep -megan -fire_emis", "-fan full -bgc bgc -crop" ) {
    &make_env_run();
    eval{ system( "$bldnml -envxml_dir . $options > $tempfile 2>&1 " ); };
    is( $@, '', "options: $options" );
@@ -333,6 +333,7 @@ foreach my $driver ( "nuopc" ) {
                          "-bgc bgc -crop -clm_accelerated_spinup sasu",
                          "-res 0.9x1.25 -clm_start_type startup", "-namelist '&a irrigate=.false./' -crop -bgc bgc",
                          "-res 0.9x1.25 -infile myuser_nl_clm",
+                         "-res 0.9x1.25 -fan on -bgc bgc -crop", "-fan atm -bgc cn -crop", "-fan soil -bgc bgc -crop ",
                          "-res 0.9x1.25 -ignore_ic_date -clm_start_type branch -namelist '&a nrevsn=\"thing.nc\"/' -bgc bgc -crop",
                          "-res 0.9x1.25 -clm_start_type branch -namelist '&a nrevsn=\"thing.nc\",use_init_interp=T/'",
                          "-res 0.9x1.25 -ignore_ic_date -clm_start_type startup -namelist '&a finidat=\"thing.nc\"/' -bgc bgc -crop",
@@ -624,6 +625,21 @@ my %failtest = (
                                    },
      "startup without interp"    =>{ options=>"-clm_start_type startup -envxml_dir . -bgc sp -sim_year 1850",
                                      namelst=>"use_init_interp=.false., start_ymd=19200901",
+                                     phys=>"clm5_0",
+                                   },
+     "bad_fan_mode"              =>{ options=>" -envxml_dir . -fan zztop",
+                                     namelst=>"",
+                                     GLC_TWO_WAY_COUPLING=>"FALSE",
+                                     phys=>"clm5_0",
+                                   },
+     "fan_wo_crop"               =>{ options=>" -envxml_dir . -fan on -bgc bgc",
+                                     namelst=>"",
+                                     GLC_TWO_WAY_COUPLING=>"FALSE",
+                                     phys=>"clm5_0",
+                                   },
+     "fan_w_fates"               =>{ options=>" -envxml_dir . -fan on -bgc fates",
+                                     namelst=>"",
+                                     GLC_TWO_WAY_COUPLING=>"FALSE",
                                      phys=>"clm5_0",
                                    },
      "use_crop without -crop"    =>{ options=>" -envxml_dir .",

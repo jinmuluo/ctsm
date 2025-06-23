@@ -39,11 +39,13 @@ module CNDriverMod
   use PhotosynthesisMod               , only : photosyns_type
   use ch4Mod                          , only : ch4_type
   use EnergyFluxType                  , only : energyflux_type
+  use FrictionVelocityMod             , only : frictionvel_type
   use SaturatedExcessRunoffMod        , only : saturated_excess_runoff_type
   use ActiveLayerMod                  , only : active_layer_type
   use SoilWaterRetentionCurveMod      , only : soil_water_retention_curve_type
   use CLMFatesInterfaceMod            , only : hlm_fates_interface_type
   use CropReprPoolsMod                , only : nrepr
+  use SoilHydrologyType               , only: soilhydrology_type
   !
   ! !PUBLIC TYPES:
   implicit none
@@ -103,9 +105,9 @@ contains
        active_layer_inst, clm_fates,                                                       &
        atm2lnd_inst, waterstatebulk_inst, waterdiagnosticbulk_inst, waterfluxbulk_inst,    &
        wateratm2lndbulk_inst, canopystate_inst, soilstate_inst, temperature_inst,          &
-       soil_water_retention_curve, crop_inst, ch4_inst,                                    &
-       dgvs_inst, photosyns_inst, saturated_excess_runoff_inst, energyflux_inst,           &
-       nutrient_competition_method, cnfire_method, dribble_crophrv_xsmrpool_2atm)
+       soil_water_retention_curve, crop_inst, ch4_inst,            &
+       dgvs_inst, photosyns_inst, saturated_excess_runoff_inst, energyflux_inst,                   &
+       nutrient_competition_method, cnfire_method, dribble_crophrv_xsmrpool_2atm, frictionvel_inst)
     !
     ! !DESCRIPTION:
     ! The core CN code is executed here. Calculates fluxes for maintenance
@@ -205,6 +207,7 @@ contains
     type(photosyns_type)                    , intent(in)    :: photosyns_inst
     type(saturated_excess_runoff_type)      , intent(in)    :: saturated_excess_runoff_inst
     type(energyflux_type)                   , intent(in)    :: energyflux_inst
+    type(frictionvel_type)                  , intent(inout) :: frictionvel_inst
     class(nutrient_competition_method_type) , intent(inout) :: nutrient_competition_method
     class(fire_method_type)                 , intent(inout) :: cnfire_method
     logical                                 , intent(in)    :: dribble_crophrv_xsmrpool_2atm
@@ -299,8 +302,13 @@ contains
     ! --------------------------------------------------
 
     call t_startf('CNDeposition')
-    call CNNDeposition(bounds, &
-         atm2lnd_inst, soilbiogeochem_nitrogenflux_inst)
+    call CNNDeposition(bounds, num_bgc_soilc, filter_bgc_soilc, &
+         atm2lnd_inst, wateratm2lndbulk_inst, &
+         soilbiogeochem_nitrogenflux_inst, cnveg_carbonstate_inst, &
+         soilbiogeochem_nitrogenstate_inst, soilbiogeochem_carbonflux_inst, &
+         cnveg_nitrogenstate_inst, cnveg_nitrogenflux_inst, &
+         waterstatebulk_inst, soilstate_inst, temperature_inst, &
+         waterfluxbulk_inst, frictionvel_inst)
     call t_stopf('CNDeposition')
     
     if(use_fun)then
@@ -318,7 +326,7 @@ contains
   
 
     if (use_crop) then
-       call CNNFert(bounds, num_bgc_soilc,filter_bgc_soilc, &
+       call CNNFert(bounds, num_bgc_soilc,filter_bgc_soilc, num_pcropp, filter_pcropp,&
             cnveg_nitrogenflux_inst, soilbiogeochem_nitrogenflux_inst)
 
        if (.not. use_fun) then  ! if FUN is active, then soy fixation handled by FUN
@@ -404,6 +412,7 @@ contains
                crop_inst, canopystate_inst, soilstate_inst, dgvs_inst, &
                cnveg_state_inst, cnveg_carbonstate_inst, cnveg_carbonflux_inst, &
                cnveg_nitrogenstate_inst, cnveg_nitrogenflux_inst, &
+               soilbiogeochem_nitrogenstate_inst, &
                c13_cnveg_carbonstate_inst, c14_cnveg_carbonstate_inst, &
                leaf_prof_patch=soilbiogeochem_state_inst%leaf_prof_patch(begp:endp,1:nlevdecomp_full), &
                froot_prof_patch=soilbiogeochem_state_inst%froot_prof_patch(begp:endp,1:nlevdecomp_full), &
@@ -534,6 +543,7 @@ contains
                crop_inst, canopystate_inst, soilstate_inst, dgvs_inst, &
                cnveg_state_inst, cnveg_carbonstate_inst, cnveg_carbonflux_inst, &
                cnveg_nitrogenstate_inst, cnveg_nitrogenflux_inst, &
+               soilbiogeochem_nitrogenstate_inst, &
                c13_cnveg_carbonstate_inst, c14_cnveg_carbonstate_inst, &
                leaf_prof_patch=soilbiogeochem_state_inst%leaf_prof_patch(begp:endp,1:nlevdecomp_full), &
                froot_prof_patch=soilbiogeochem_state_inst%froot_prof_patch(begp:endp,1:nlevdecomp_full), &
@@ -545,6 +555,7 @@ contains
             crop_inst, canopystate_inst, soilstate_inst, dgvs_inst, &
             cnveg_state_inst, cnveg_carbonstate_inst, cnveg_carbonflux_inst, &
             cnveg_nitrogenstate_inst, cnveg_nitrogenflux_inst, &
+            soilbiogeochem_nitrogenstate_inst, &
             c13_cnveg_carbonstate_inst, c14_cnveg_carbonstate_inst, &
             leaf_prof_patch=soilbiogeochem_state_inst%leaf_prof_patch(begp:endp,1:nlevdecomp_full), &
             froot_prof_patch=soilbiogeochem_state_inst%froot_prof_patch(begp:endp,1:nlevdecomp_full), &
@@ -1016,7 +1027,7 @@ contains
        c13_cnveg_carbonstate_inst,c14_cnveg_carbonstate_inst, &
        c13_cnveg_carbonflux_inst,c14_cnveg_carbonflux_inst, &
        c13_soilbiogeochem_carbonstate_inst,c14_soilbiogeochem_carbonstate_inst,&
-       c13_soilbiogeochem_carbonflux_inst,c14_soilbiogeochem_carbonflux_inst)
+       c13_soilbiogeochem_carbonflux_inst,c14_soilbiogeochem_carbonflux_inst, soilhydrology_inst)
     !
     ! !DESCRIPTION:
     ! Update the nitrogen leaching rate as a function of soluble mineral N and total soil water outflow.
@@ -1030,7 +1041,8 @@ contains
     use CNSoilMatrixMod           , only: CNSoilMatrix
     use clm_time_manager          , only: is_first_step_of_this_run_segment,is_beg_curr_year,is_end_curr_year,get_curr_date
     use CNSharedParamsMod         , only: use_matrixcn
-    use SoilBiogeochemDecompCascadeConType, only: use_soil_matrixcn
+    use SoilBiogeochemDecompCascadeConType , only : use_soil_matrixcn
+    use SoilNitrogenMovementMod           , only: SoilNitrogenMovement, use_nvmovement
     !
     ! !ARGUMENTS:
     type(bounds_type)                       , intent(in)    :: bounds  
@@ -1063,9 +1075,20 @@ contains
     type(soilbiogeochem_carbonflux_type)    , intent(inout) :: c13_soilbiogeochem_carbonflux_inst
     type(soilbiogeochem_carbonstate_type)   , intent(inout) :: c14_soilbiogeochem_carbonstate_inst
     type(soilbiogeochem_carbonflux_type)    , intent(inout) :: c14_soilbiogeochem_carbonflux_inst
+    type(soilhydrology_type)                , intent(in)    :: soilhydrology_inst
     integer p,fp,yr,mon,day,sec
     !-----------------------------------------------------------------------
-  
+ 
+    ! -------------------------------------------
+    ! soil nitrate fast aqueous movement
+    ! -------------------------------------------
+    if (use_nitrif_denitrif .and. use_nvmovement) then
+       call t_startf('SoilNitrogenMovementMod')
+       call SoilNitrogenMovement(bounds, num_bgc_soilc, filter_bgc_soilc, waterstatebulk_inst, &
+            soilstate_inst, soilhydrology_inst, soilbiogeochem_nitrogenflux_inst, soilbiogeochem_nitrogenstate_inst)
+       call t_stopf('SoilNitrogenMovementMod')
+    end if
+ 
     ! Mineral nitrogen dynamics (deposition, fixation, leaching)
     
     call t_startf('SoilBiogeochemNLeaching')

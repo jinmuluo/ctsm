@@ -122,6 +122,7 @@ contains
     use CNFUNMod                         , only : CNFUNReadNML
     use CNNDynamicsMod                   , only : CNNDynamicsReadNML
     use CNPhenologyMod                   , only : CNPhenologyReadNML
+    use Fan2CTSMMod                      , only : fan_readnml
     use landunit_varcon                  , only : max_lunit
     use CNSoilMatrixMod                  , only : CNSoilMatrixInit
     !
@@ -286,6 +287,8 @@ contains
     namelist /clm_inparm/ use_hillslope_routing
 
     namelist /clm_inparm/ hillslope_fsat_equals_zero
+
+    namelist /clm_inparm/ use_fan
 
     namelist /clm_inparm/ use_hydrstress
 
@@ -626,6 +629,10 @@ contains
        call CNPhenologyReadNML       ( NLFilename )
     end if
 
+    if ( use_fan ) then
+       call fan_readnml ( NLFilename )
+    end if
+    
     ! CN soil matrix
 
     call CNSoilMatrixInit()
@@ -880,6 +887,8 @@ contains
     call mpi_bcast (use_hillslope_routing, 1, MPI_LOGICAL, 0, mpicom, ier)
 
     call mpi_bcast (hillslope_fsat_equals_zero, 1, MPI_LOGICAL, 0, mpicom, ier)
+
+    call mpi_bcast (use_fan, 1, MPI_LOGICAL, 0, mpicom, ier)
 
     call mpi_bcast (use_matrixcn, 1, MPI_LOGICAL, 0, mpicom, ier)
     call mpi_bcast (use_soil_matrixcn, 1, MPI_LOGICAL, 0, mpicom, ier)
@@ -1183,6 +1192,7 @@ contains
     write(iulog,*) '   user-defined soil layer structure = ', soil_layerstruct_userdefined
     write(iulog,*) '   user-defined number of soil layers = ', soil_layerstruct_userdefined_nlevsoi
     write(iulog,*) '   plant hydraulic stress = ', use_hydrstress
+    write(iulog,*) '   FAN = ', use_fan
     if (nsrest == nsrContinue) then
        write(iulog,*) 'restart warning:'
        write(iulog,*) '   Namelist not checked for agreement with initial run.'

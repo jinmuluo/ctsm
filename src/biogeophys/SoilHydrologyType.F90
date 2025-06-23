@@ -51,7 +51,10 @@ Module SoilHydrologyType
      real(r8), pointer :: top_ice_col       (:)     ! col VIC ice len in top layers
      real(r8), pointer :: top_moist_limited_col(:)  ! col VIC soil moisture in top layers, limited to no greater than top_max_moist_col
      real(r8), pointer :: ice_col           (:,:)   ! col VIC soil ice (kg/m2) for VIC soil layers
-
+     real(r8), pointer :: qout120cm_col     (:)     ! flux of water out of soil layer at 1.200 meter [mm h2o/s]
+     real(r8), pointer :: qout_col          (:,:)   ! flux of water out of soil layer [mm h2o/s]
+     real(r8), pointer :: qin_col           (:,:)   ! flux of water into soil layer [mm h2o/s]   
+ 
    contains
 
      ! Public routines
@@ -142,6 +145,9 @@ contains
     allocate(this%top_ice_col       (begc:endc))                 ; this%top_ice_col       (:)     = nan
     allocate(this%top_moist_limited_col(begc:endc))              ; this%top_moist_limited_col(:)  = nan
     allocate(this%ice_col           (begc:endc,nlayert))         ; this%ice_col           (:,:)   = nan
+    allocate(this%qout120cm_col     (begc:endc))                 ; this%qout120cm_col     (:)     = nan
+    allocate(this%qout_col          (begc:endc,nlevsoi))         ; this%qout_col          (:,:)   = nan
+    allocate(this%qin_col           (begc:endc,nlevsoi))         ; this%qin_col           (:,:)   = nan
 
   end subroutine InitAllocate
 
@@ -149,7 +155,7 @@ contains
   subroutine InitHistory(this, bounds, use_aquifer_layer)
     !
     ! !USES:
-    use histFileMod    , only : hist_addfld1d
+    use histFileMod    , only : hist_addfld1d, hist_addfld2d
     !
     ! !ARGUMENTS:
     class(soilhydrology_type) :: this
@@ -192,6 +198,21 @@ contains
          avgflag='A', long_name='perched water table depth (natural vegetated and crop landunits only)', &
          ptr_col=this%zwt_perched_col, l2g_scale_type='veg')
 
+    this%qout120cm_col(begc:endc) = spval
+    call hist_addfld1d (fname="QOUT120cm", units='mm h2o/s', &
+         avgflag='A', long_name='flux of water out of soil layer (1.20 meters)', &
+         ptr_col=this%qout120cm_col) 
+
+    this%qout_col(begc:endc, :) = spval
+    call hist_addfld2d (fname="QOUT", units='mm h2o/s',  type2d='levsoi', &
+         avgflag='A', long_name='flux of water out of soil layer', &
+         ptr_col=this%qout_col)
+
+    this%qin_col(begc:endc, :) = spval
+    call hist_addfld2d (fname="QIN", units='mm h2o/s',  type2d='levsoi', &
+         avgflag='A', long_name='flux of water into of soil layer', &
+         ptr_col=this%qin_col)
+
   end subroutine InitHistory
 
   !-----------------------------------------------------------------------
@@ -213,6 +234,7 @@ contains
     ! averaging for the accum field
     do c = bounds%begc, bounds%endc
        this%num_substeps_col(c) = spval
+       this%qout120cm_col(c) = spval
     end do
 
     !-----------------------------------------------------------------------

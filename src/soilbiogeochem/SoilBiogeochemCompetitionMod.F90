@@ -8,7 +8,7 @@ module SoilBiogeochemCompetitionMod
   use shr_kind_mod                    , only : r8 => shr_kind_r8
   use shr_log_mod                     , only : errMsg => shr_log_errMsg
   use clm_varcon                      , only : dzsoi_decomp
-  use clm_varctl                      , only : use_nitrif_denitrif
+  use clm_varctl                      , only : use_nitrif_denitrif, use_fan
   use abortutils                      , only : endrun
   use decompMod                       , only : bounds_type
   use SoilBiogeochemStateType         , only : soilbiogeochem_state_type
@@ -179,11 +179,14 @@ contains
     use clm_varpar       , only: nlevdecomp, ndecomp_cascade_transitions
     use clm_varpar       , only: i_cop_mic, i_oli_mic
     use clm_varcon       , only: nitrif_n2o_loss_frac
+    use LandunitType     , only: lun
+    use landunit_varcon  , only: istsoil, istcrop
     use CNSharedParamsMod, only: use_fun
     use CNFUNMod         , only: CNFUN
     use subgridAveMod    , only: p2c
     use perf_mod         , only : t_startf, t_stopf
     use SoilBiogeochemDecompCascadeConType , only : decomp_cascade_con,  mimics_decomp, decomp_method
+    use Fan3Mod          , only:  use_canopy_reduction 
     !
     ! !ARGUMENTS:
     type(bounds_type)                       , intent(in)    :: bounds
@@ -272,6 +275,13 @@ contains
          n2_n2o_ratio_denit_vr        => soilbiogeochem_nitrogenflux_inst%n2_n2o_ratio_denit_vr_col    , & ! Output: [real(r8) (:,:) ]  ratio of N2 to N2O production by denitrification [gN/gN]
          f_n2o_denit_vr               => soilbiogeochem_nitrogenflux_inst%f_n2o_denit_vr_col           , & ! Output: [real(r8) (:,:) ]  flux of N2O from denitrification [gN/m3/s]
          f_n2o_nit_vr                 => soilbiogeochem_nitrogenflux_inst%f_n2o_nit_vr_col             , & ! Output: [real(r8) (:,:) ]  flux of N2O from nitrification [gN/m3/s]
+         f_nox_denit_vr               => soilbiogeochem_nitrogenflux_inst%f_nox_denit_vr_col           , & ! Output: [real(r8) (:,:) ]  flux of NOx from denitrification [gN/m3/s]
+         f_nox_nit_vr                 => soilbiogeochem_nitrogenflux_inst%f_nox_nit_vr_col             , & ! Output: [real(r8) (:,:) ]  flux of NOx from nitrification [gN/m3/s]
+         f_n2_denit_vr                => soilbiogeochem_nitrogenflux_inst%f_n2_denit_vr_col            , & ! Output: [real(r8] (:,:) ]  flux of N2 from denintrification [gN/m3/s]        
+         f_canopy_to_soil_vr          => soilbiogeochem_nitrogenflux_inst%f_canopy_to_soil_vr_col      , & ! Output: [real(r8) (:,:) ]  NOx reduced by canopy, back to soil NH4+ [gN/m3/s]
+         ratio_nox_n2o                => soilbiogeochem_nitrogenflux_inst%ratio_nox_n2o_col            , & ! Input:  [real(r8) (:,:) ]
+         nitrif_lost_as_n2o           => soilbiogeochem_nitrogenflux_inst%nitrif_lost_as_n2o_col       , & ! Input:  [real(r8) (:,:) ]  fraction of nitrification flux lost as n2o, unitless 
+         CR                           => soilbiogeochem_nitrogenstate_inst%CR_col                      , & ! Input:  [real(r8) (:)   ]  canopy reduction coefficience, unitless     
          supplement_to_sminn_vr       => soilbiogeochem_nitrogenflux_inst%supplement_to_sminn_vr_col   , & ! Output: [real(r8) (:,:) ]                                        
          sminn_to_plant_vr            => soilbiogeochem_nitrogenflux_inst%sminn_to_plant_vr_col        , & ! Output: [real(r8) (:,:) ]                                        
          potential_immob_vr           => soilbiogeochem_nitrogenflux_inst%potential_immob_vr_col       , & ! Input:  [real(r8) (:,:) ]                                        
@@ -718,9 +728,20 @@ contains
                end if
 
                ! n2o emissions: n2o from nitr is const fraction, n2o from denitr is calculated in nitrif_denitrif
-               f_n2o_nit_vr(c,j) = f_nit_vr(c,j) * nitrif_n2o_loss_frac
+               f_n2o_nit_vr(c,j) = f_nit_vr(c,j) * nitrif_lost_as_n2o(c,j) 
                f_n2o_denit_vr(c,j) = f_denit_vr(c,j) / (1._r8 + n2_n2o_ratio_denit_vr(c,j))
-
+               f_n2_denit_vr(c, j) = n2_n2o_ratio_denit_vr(c,j) * f_n2o_denit_vr(c,j) 
+ 
+               ! nox emissions after canopy capture
+               if (use_fan .and. use_canopy_reduction) then
+                  f_nox_nit_vr(c,j) = ratio_nox_n2o(c,j) * f_n2o_nit_vr(c,j) * CR(c)
+                  f_nox_denit_vr(c,j) = 0.0_r8 * f_n2o_denit_vr(c,j) * CR(c)
+                  f_canopy_to_soil_vr(c,j) = (f_n2o_nit_vr(c,j) ) * ratio_nox_n2o(c,j) * (1 - CR(c)) 
+               else
+                  f_nox_nit_vr(c,j) = ratio_nox_n2o(c,j) * f_n2o_nit_vr(c,j) 
+                  f_nox_denit_vr(c,j) = 0.0_r8 * f_n2o_denit_vr(c,j)
+                  f_canopy_to_soil_vr(c,j) = 0.0_r8 
+               end if 
 
                ! this code block controls the addition of N to sminn pool
                ! to eliminate any N limitation, when Carbon_Only is set.  This lets the
@@ -798,10 +819,7 @@ contains
                                  sminn_to_plant_fun_no3_vr(c,j),smin_no3_to_plant_vr(c,j)
                       call endrun("too much NO3 uptake predicted by FUN")
                   end if
-!KO                  if ((sminn_to_plant_fun_nh4_vr(c,j)-smin_nh4_to_plant_vr(c,j)).gt.0.0000000000001_r8) then
-!KO
                   if ((sminn_to_plant_fun_nh4_vr(c,j)-smin_nh4_to_plant_vr(c,j)).gt.0.0000001_r8) then
-!KO
                       write(iulog,*) 'problem with limitations on nh4 uptake', &
                                   sminn_to_plant_fun_nh4_vr(c,j),smin_nh4_to_plant_vr(c,j)
                       call endrun("too much NH4 uptake predicted by FUN")

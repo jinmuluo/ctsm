@@ -488,6 +488,7 @@ contains
     !
     ! !USES:
     use clm_varctl, only : use_crop
+    use clm_varctl, only : use_fan
     use subgridAveMod, only: c2g
     use atm2lndType, only: atm2lnd_type
     !
@@ -540,15 +541,24 @@ contains
          nfix_to_sminn       => soilbiogeochem_nitrogenflux_inst%nfix_to_sminn_col       , & ! Input:  [real(r8) (:) ]  (gN/m2/s) symbiotic/asymbiotic N fixation to soil mineral N 
          ffix_to_sminn       => soilbiogeochem_nitrogenflux_inst%ffix_to_sminn_col       , & ! Input:  [real(r8) (:) ]  (gN/m2/s) free living N fixation to soil mineral N         
          fert_to_sminn       => soilbiogeochem_nitrogenflux_inst%fert_to_sminn_col       , & ! Input:  [real(r8) (:) ]  (gN/m2/s)                                         
+         nitrate_n_to_sminn  => soilbiogeochem_nitrogenflux_inst%nitrate_n_to_sminn_col  , & ! Input;  [real(r8) (:) ]  (gN/m2/s) nitrate diffusion to deep soil from fanv3
          soyfixn_to_sminn    => soilbiogeochem_nitrogenflux_inst%soyfixn_to_sminn_col    , & ! Input:  [real(r8) (:) ]  (gN/m2/s)                                         
          supplement_to_sminn => soilbiogeochem_nitrogenflux_inst%supplement_to_sminn_col , & ! Input:  [real(r8) (:) ]  (gN/m2/s) supplemental N supply                           
          denit               => soilbiogeochem_nitrogenflux_inst%denit_col               , & ! Input:  [real(r8) (:) ]  (gN/m2/s) total rate of denitrification           
          sminn_leached       => soilbiogeochem_nitrogenflux_inst%sminn_leached_col       , & ! Input:  [real(r8) (:) ]  (gN/m2/s) soil mineral N pool loss to leaching   
          smin_no3_leached    => soilbiogeochem_nitrogenflux_inst%smin_no3_leached_col    , & ! Input:  [real(r8) (:) ]  (gN/m2/s) soil mineral NO3 pool loss to leaching 
          smin_no3_runoff     => soilbiogeochem_nitrogenflux_inst%smin_no3_runoff_col     , & ! Input:  [real(r8) (:) ]  (gN/m2/s) soil mineral NO3 pool loss to runoff   
-         f_n2o_nit           => soilbiogeochem_nitrogenflux_inst%f_n2o_nit_col           , & ! Input:  [real(r8) (:) ]  (gN/m2/s) flux of N2o from nitrification 
+         f_n2o_nit           => soilbiogeochem_nitrogenflux_inst%f_n2o_nit_col           , & ! Input:  [real(r8) (:) ]  (gN/m2/s) flux of N2O from nitrification 
+         f_nox_nit           => soilbiogeochem_nitrogenflux_inst%f_nox_nit_col           , & ! Input:  [real(r8) (:) ]  (gN/m2/s) flux of NOx from nitrification
+         f_n2o_denit         => soilbiogeochem_nitrogenflux_inst%f_n2o_denit_col         , & ! Input:  [real(r8) (:) ]  (gN/m2/s) flux of N2O from denitrification 
+         f_nox_denit         => soilbiogeochem_nitrogenflux_inst%f_nox_denit_col         , & ! Input:  [real(r8) (:) ]  (gN/m2/s) flux of NOx from denitrification
+         f_n2_denit          => soilbiogeochem_nitrogenflux_inst%f_n2_denit_col          , & ! Input:  [real(r8) (:) ]  (gN/m2/s) flux of N2 from denitrification 
+         
          som_n_leached       => soilbiogeochem_nitrogenflux_inst%som_n_leached_col       , & ! Input:  [real(r8) (:) ]  (gN/m2/s) total SOM N loss from vertical transport
 
+         fan_totnin          => soilbiogeochem_nitrogenflux_inst%fan_totnin_col          , & ! Input:  [real(r8) (:) ]  (gN/m2/s) total N input into the FAN pools
+         fan_totnout         => soilbiogeochem_nitrogenflux_inst%fan_totnout_col         , & ! Input:  [real(r8) (:) ]  (gN/m2/s) total N output from the FAN pools
+      
          col_fire_nloss      => cnveg_nitrogenflux_inst%fire_nloss_col                   , & ! Input:  [real(r8) (:) ]  (gN/m2/s) total column-level fire N loss 
          wood_harvestn       => cnveg_nitrogenflux_inst%wood_harvestn_col                , & ! Input:  [real(r8) (:) ]  (gN/m2/s) wood harvest (to product pools)
          gru_conv_nflux_grc  => cnveg_nitrogenflux_inst%gru_conv_nflux_grc               , & ! Input:  [real(r8) (:) ]  (gC/m2/s) wood harvest (to product pools) summed to the gridcell level
@@ -556,7 +566,7 @@ contains
          gru_wood_productn_gain => cnveg_nitrogenflux_inst%gru_wood_productn_gain_col    , & ! Input:  [real(r8) (:) ]  (gC/m2/s) wood harvest (to product pools)
          gru_wood_productn_gain_grc => cnveg_nitrogenflux_inst%gru_wood_productn_gain_grc, & ! Input:  [real(r8) (:) ]  (gC/m2/s) wood harvest (to product pools) summed to the gridcell level
          crop_harvestn_to_cropprodn => cnveg_nitrogenflux_inst%crop_harvestn_to_cropprodn_col          , & ! Input:  [real(r8) (:) ]  (gN/m2/s) crop harvest N to 1-year crop product pool
-
+         nh4_diffusion       => soilbiogeochem_nitrogenflux_inst%nh4_upward_diffusion_col              , & ! Output: [real(r8) (:) ]  (gN/m2/s) nh4 upward siffusion from CLM to FAN
          totcoln             => soilbiogeochem_nitrogenstate_inst%totn_col               , & ! Input:  [real(r8) (:) ]  (gN/m2) total column nitrogen, incl veg
          sminn_to_plant      => soilbiogeochem_nitrogenflux_inst%sminn_to_plant_col,       &
          fates_litter_flux   => soilbiogeochem_nitrogenflux_inst%fates_litter_flux  &   ! Total nitrogen litter flux from FATES to CLM [gN/m2/s]
@@ -596,11 +606,17 @@ contains
             col_ninputs(c) = col_ninputs(c) + fert_to_sminn(c) + soyfixn_to_sminn(c)
          end if
 
+         if (use_fan) then
+            col_ninputs(c) = col_ninputs(c) + nitrate_n_to_sminn(c)
+         end if
+
+         col_ninputs(c) = col_ninputs(c) + fan_totnin(c)
+
          col_ninputs_partial(c) = col_ninputs(c)
          
          ! calculate total column-level outputs
-
-         col_noutputs(c) = denit(c)
+      
+         col_noutputs(c) = 0.0_r8
 
          if( .not.col%is_fates(c) ) then
             
@@ -618,19 +634,24 @@ contains
          else
             
             ! If we are using fates, remove plant uptake
-            col_noutputs(c) = col_noutputs(c) +  sminn_to_plant(c)
+            col_noutputs(c) = col_noutputs(c) + sminn_to_plant(c)
             
          end if
 
          if (.not. use_nitrif_denitrif) then
             col_noutputs(c) = col_noutputs(c) + sminn_leached(c)
          else
-            col_noutputs(c) = col_noutputs(c) + f_n2o_nit(c)
-
+            col_noutputs(c) = col_noutputs(c) + f_n2o_nit(c) + f_nox_nit(c)
+            col_noutputs(c) = col_noutputs(c) + f_n2o_denit(c) + f_nox_denit(c) + f_n2_denit(c) 
             col_noutputs(c) = col_noutputs(c) + smin_no3_leached(c) + smin_no3_runoff(c)
          end if
 
          col_noutputs(c) = col_noutputs(c) - som_n_leached(c)
+         col_noutputs(c) = col_noutputs(c) + fan_totnout(c)
+
+         if (use_fan) then
+            col_noutputs(c) = col_noutputs(c) + nh4_diffusion(c)
+         end if
          
          col_noutputs_partial(c) = col_noutputs(c)
 
@@ -653,6 +674,7 @@ contains
             write(iulog,*) 'nbalance warning at c =', c, col_errnb(c), col_endnb(c)
             write(iulog,*)'inputs,ffix,nfix,ndep = ',ffix_to_sminn(c)*dt,nfix_to_sminn(c)*dt,ndep_to_sminn(c)*dt
             write(iulog,*)'outputs,lch,roff,dnit = ',smin_no3_leached(c)*dt, smin_no3_runoff(c)*dt,f_n2o_nit(c)*dt
+            !call endrun(msg='N balance warning stop!!')
          end if
 
       end do ! end of columns loop
@@ -668,14 +690,17 @@ contains
          write(iulog,*)'output mass              = ',col_noutputs(c)*dt
          write(iulog,*)'net flux                 = ',(col_ninputs(c)-col_noutputs(c))*dt
          if(col%is_fates(c))then
-            write(iulog,*)'inputs,ndep,nfix,suppn= ',ndep_to_sminn(c)*dt,nfix_to_sminn(c)*dt,supplement_to_sminn(c)*dt
+            write(iulog,*)'inputs,ndep,nfix,suppn,fan= ',ndep_to_sminn(c)*dt,nfix_to_sminn(c)*dt,supplement_to_sminn(c)*dt,fan_totnin(c)*dt
          else
-            write(iulog,*)'inputs,ffix,nfix,ndep = ',ffix_to_sminn(c)*dt,nfix_to_sminn(c)*dt,ndep_to_sminn(c)*dt
+            write(iulog,*)'inputs,ffix,nfix,ndep,fan = ',ffix_to_sminn(c)*dt,nfix_to_sminn(c)*dt,ndep_to_sminn(c)*dt,fan_totnin(c)*dt
          end if
          if(col%is_fates(c))then
-            write(iulog,*)'outputs,lch,roff,dnit,plnt = ',smin_no3_leached(c)*dt, smin_no3_runoff(c)*dt,f_n2o_nit(c)*dt,sminn_to_plant(c)*dt
+            write(iulog,*)'outputs,lch,roff,gas,plnt,fan = ',smin_no3_leached(c)*dt, smin_no3_runoff(c)*dt,&
+                                                            (f_nox_nit(c)+f_nox_denit(c)+f_n2o_nit(c)+f_n2o_denit(c)+f_n2_denit(c))*dt,&
+                                                            sminn_to_plant(c)*dt,fan_totnout(c)*dt
          else
-            write(iulog,*)'outputs,lch,roff,dnit    = ',smin_no3_leached(c)*dt, smin_no3_runoff(c)*dt,f_n2o_nit(c)*dt
+            write(iulog,*)'outputs,lch,roff,gas,fan = ',smin_no3_leached(c)*dt, smin_no3_runoff(c)*dt,&
+                                                        (f_nox_nit(c)+f_nox_denit(c)+f_n2o_nit(c)+f_n2o_denit(c)+f_n2_denit(c))*dt,fan_totnout(c)*dt
          end if
          call endrun(subgrid_index=c, subgrid_level=subgrid_level_column, msg=errMsg(sourcefile, __LINE__))
       end if
@@ -759,7 +784,6 @@ contains
             write(iulog,*) 'product_loss_grc         =', product_loss_grc(g) * dt
             call endrun(subgrid_index=g, subgrid_level=subgrid_level_gridcell, msg=errMsg(sourcefile, __LINE__))
          end if
-         
       end if if_notfates
 
     end associate
