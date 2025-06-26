@@ -98,6 +98,7 @@ module SoilBiogeochemNitrogenFluxType
      real(r8), pointer :: n2o_denitrify_total_col                    (:)   ! Total N2O emission from denitrification, gN/m2/s
 
      real(r8), pointer :: nox_total_col                              (:)   ! Total NOx emission from soil, gN/m2/s
+     real(r8), pointer :: flux_nox_col                               (:)   ! Total NOx emission from CLM and FAN (to atm), gN/m2/s
      real(r8), pointer :: n2o_total_col                              (:)   ! Total N2O emission from soil, gN/m2/s
      real(r8), pointer :: n2_total_col                               (:)   ! Total N2 emission from soil, gN/ms/s
 
@@ -343,6 +344,7 @@ contains
        allocate(this%n2o_denitrify_total_col        (begc:endc))                   ; this%n2o_denitrify_total_col    (:)   = spval
 
        allocate(this%nox_total_col                  (begc:endc))                   ; this%nox_total_col              (:)   = spval
+       allocate(this%flux_nox_col                   (begc:endc))                   ; this%flux_nox_col               (:)   = spval
        allocate(this%n2o_total_col                  (begc:endc))                   ; this%n2o_total_col              (:)   = spval
        allocate(this%n2_total_col                   (begc:endc))                   ; this%n2_total_col               (:)   = spval
     end if
@@ -789,6 +791,11 @@ contains
        call hist_addfld1d( fname='NOx_TOTAL', units='gN/m^2/s', &
             avgflag='A', long_name='Total NOx emission from soil', &
             ptr_col=this%nox_total_col)
+
+       this%flux_nox_col(begc:endc) = spval
+       call hist_addfld1d( fname='NOx_TOTAL_COMBINE', units='gN/m^2/s', &
+            avgflag='A', long_name='Total NOx emission (FAN + CLM) from soil', &
+            ptr_col=this%flux_nox_col)
 
        this%n2o_total_col(begc:endc) = spval
        call hist_addfld1d( fname='N2O_TOTAL', units='gN/m^2/s', &
@@ -1614,7 +1621,8 @@ contains
           this%nox_denitrify_total_col(i)   = value_column
           this%n2o_nitrify_total_col(i)     = value_column
           this%n2o_denitrify_total_col(i)   = value_column
-          this%nox_total_col(i)             = value_column 
+          this%nox_total_col(i)             = value_column
+          this%flux_nox_col(i)              = value_column 
           this%n2o_total_col(i)             = value_column
           this%n2_total_col(i)              = value_column
        end do
@@ -1824,6 +1832,9 @@ contains
        do fc = 1,num_bgc_soilc
           c = filter_bgc_soilc(fc)
           this%denit_col(c) = this%f_denit_col(c)
+
+          !sumarize the NOx (FAN + CLM) to atm there
+          this%flux_nox_col(c) = this%nox_total_col(c) + this%f_nox_nit_col(c) + this%f_nox_denit_col(c) 
        end do
 
     end if

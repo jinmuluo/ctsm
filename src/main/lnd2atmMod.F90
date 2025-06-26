@@ -346,6 +346,12 @@ contains
             sbgc_nf_inst%nh3_total_col (bounds%begc:bounds%endc), &
             lnd2atm_inst%flux_nh3_grc  (bounds%begg:bounds%endg), &
             c2l_scale_type= 'unity', l2g_scale_type='unity')
+ 
+       ! Temporarily place NOx emission flux here
+       call c2g(bounds,     &
+            sbgc_nf_inst%flux_nox_col(bounds%begc:bounds%endc), &   ! From FAN + CLM layer
+            lnd2atm_inst%flux_nox_grc(bounds%begg:bounds%endg), &
+            c2l_scale_type= 'unity', l2g_scale_type='unity')
     end if
 
     !----------------------------------------------------

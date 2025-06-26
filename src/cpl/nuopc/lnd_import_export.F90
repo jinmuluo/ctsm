@@ -135,6 +135,7 @@ module lnd_import_export
   character(*), parameter :: Sl_ddvel       = 'Sl_ddvel'
   character(*), parameter :: Fall_voc       = 'Fall_voc'
   character(*), parameter :: Fall_fan       = 'Fall_FAN_nh3'
+  character(*), parameter :: Fall_nox       = 'Fall_nox'
   character(*), parameter :: Fall_fire      = 'Fall_fire'
   character(*), parameter :: Sl_fztop       = 'Sl_fztop'
   character(*), parameter :: Flrl_rofsur    = 'Flrl_rofsur'
@@ -305,6 +306,8 @@ contains
        end if
        if (fan_have_fields) then
           call fldlist_add(fldsFrLnd_num, fldsFrLnd, Fall_fan)
+          !Temporarily place NOx emisison here
+          call fldlist_add(fldsFrLnd_num, fldsFrLnd, Fall_nox)
        end if
     end if
 
@@ -862,6 +865,11 @@ contains
        end if
        if (fldchk(exportState, Fall_fan)) then
           call state_setexport_1d(exportState, Fall_fan, lnd2atm_inst%flux_nh3_grc(begg:), &
+               init_spval=.true., rc=rc)
+          if (ChkErr(rc,__LINE__,u_FILE_u)) return
+       end if
+       if (fldchk(exportState, Fall_nox)) then
+          call state_setexport_1d(exportState, Fall_nox, lnd2atm_inst%flux_nox_grc(begg:), &
                init_spval=.true., rc=rc)
           if (ChkErr(rc,__LINE__,u_FILE_u)) return
        end if

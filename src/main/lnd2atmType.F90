@@ -60,7 +60,7 @@ module lnd2atmType
      real(r8), pointer :: fireztop_grc       (:)   => null() ! Wild Fire Emissions vertical distribution top
      real(r8), pointer :: ch4_surf_flux_tot_grc(:) => null() ! net CH4 flux (kg C/m**2/s) [+ to atm]
      real(r8), pointer :: flux_nh3_grc       (:)   => null() ! gross NH3 emission (gN/m2/s) [+ to atm]
-     
+     real(r8), pointer :: flux_nox_grc       (:)   => null() ! gross NOx emission (gN/m2/s) from CLM and FAN [+ to atm] 
      ! lnd->rof
 
    contains
@@ -162,6 +162,7 @@ contains
           call endrun(msg="ERROR fan_to_atm is on but use_fan is off")
        end if
        allocate(this%flux_nh3_grc       (begg:endg))            ; this%flux_nh3_grc       (:)   =ival
+       allocate(this%flux_nox_grc       (begg:endg))            ; this%flux_nox_grc       (:)   =ival
     end if
     if (shr_megan_mechcomps_n>0) then
        allocate(this%flxvoc_grc(begg:endg,1:shr_megan_mechcomps_n));  this%flxvoc_grc(:,:)=ival
@@ -304,6 +305,11 @@ contains
        call hist_addfld1d (fname='NH3_TO_COUPLER', units='gN/m2/s', &
             avgflag='A', long_name='Gridcell gross NH3 emission passed to coupler', &
             ptr_lnd=this%flux_nh3_grc)
+
+       this%flux_nox_grc(begg:endg) = 0.0_r8
+       call hist_addfld1d (fname='NOx_TO_COUPLER', units='gN/m2/s', &
+            avgflag='A', long_name='Gridcell gross NOx emission passed to coupler', &
+            ptr_lnd=this%flux_nox_grc)
     end if
   end subroutine InitHistory
 
