@@ -359,11 +359,17 @@ contains
             ! first-order decay of ammonium pool with scalar defined above
             pot_f_nit_vr(c,j) = max(smin_nh4_vr(c,j) * k_nitr_vr(c,j), 0._r8)
 
+            ! increase the potential nitrification by 5 times
+            pot_f_nit_vr(c,j) = pot_f_nit_vr(c,j) * 5.0
+
             ! limit to oxic fraction of soils
             pot_f_nit_vr(c,j)  = pot_f_nit_vr(c,j) * (1._r8 - anaerobic_frac(c,j))
 
             ! emission rate of nox and n2o 
             ratio_nox_n2o(c,j) = max(0.0_r8, 15.2_r8+35.5_r8*atan(0.68_r8*rpi*(10.0_r8*soilgd - 1.86_r8))/rpi) 
+
+            !Reduce the nox to n2o ratio by half 
+            ratio_nox_n2o(c,j) = ratio_nox_n2o(c,j) * 0.50
  
             ! limit to non-frozen soil layers
             if ( t_soisno(c,j) <= SHR_CONST_TKFRZ .and. no_frozen_nitrif_denitrif) then
@@ -409,7 +415,10 @@ contains
             endif
 
             ! limit to anoxic fraction of soils
-            pot_f_denit_vr(c,j) = f_denit_base_vr(c,j) * anaerobic_frac(c,j)
+            !pot_f_denit_vr(c,j) = f_denit_base_vr(c,j) * anaerobic_frac(c,j)
+
+            ! limit to fd_WFPS (Del Grosso et al., 2001) 
+            pot_f_denit_vr(c,j) = f_denit_base_vr(c,j) * fd_WFPS(c,j)
 
             ! now calculate the ratio of N2O to N2 from denitrification, following Del Grosso et al., 2000
             ! diffusivity constant (figure 6b)
@@ -450,8 +459,8 @@ contains
             n2_n2o_ratio_denit_vr(c,j) = dft(c) - 1._r8  
   
             ! nitrified flux lost as n2o (Gurung et al., 2021), equation 1 and table 3
-            nitrif_lost_as_n2o(c,j) = 0.0006 + (0.0043 - 0.0006)/( 1 + exp( -( 6.27 + 24.71*0.01*wfps_vr(c,j)) ) ) 
-            nitrif_lost_as_n2o(c,j) = min(max(0.0006, nitrif_lost_as_n2o(c,j)), 0.0043) 
+            nitrif_lost_as_n2o(c,j) = 0.0006 + (0.01 - 0.0006)/( 1 + exp( -( 6.27 + 24.71*0.01*wfps_vr(c,j)) ) ) 
+            nitrif_lost_as_n2o(c,j) = min(max(0.0006, nitrif_lost_as_n2o(c,j)), 0.01) 
 
          end do
 
