@@ -144,8 +144,8 @@ subroutine eval_nitrification_n2o_nox(nitrify_flux, theta, thetasat, sg_diff, &
  
   RNOx = 15.2_r8 + 35.5_r8*atan(0.68_r8*pi*(10.0_r8*sg_diff - 1.86_r8)) / pi
   wfps = max(min(theta/thetasat, 1._r8), 0._r8)
-  nitrif_lost_as_n2o = 0.0006 + (0.0043 - 0.0006)/( 1 + exp( -( -6.27 + 24.71*wfps)) ) 
-  nitrif_lost_as_n2o = min(max(0.0006, nitrif_lost_as_n2o), 0.0043) 
+  nitrif_lost_as_n2o = 0.0006 + (0.01 - 0.0006)/( 1 + exp(6.27 - 24.71*wfps)) 
+  nitrif_lost_as_n2o = min(max(0.0006, nitrif_lost_as_n2o), 0.01) 
   no3_flux = nitrify_flux / (1_r8 + nitrif_lost_as_n2o + RNOx*nitrif_lost_as_n2o)
   n2o_n = nitrif_lost_as_n2o * no3_flux
   nox_n = RNOx * n2o_n
