@@ -30,8 +30,9 @@ module SoilNitrogenMovementMod
   ! PUBLIC MEMBER FUNCTIONS 
   public SoilNitrogenMovement
   public SoilNitrogenMovement2 
-  logical, parameter, public :: use_nvmovement = .TRUE.
- 
+  character(len=*), parameter, private :: sourcefile =  __FILE__
+
+  !------------------------------------------------------------------------ 
   contains
 
   !#1
