@@ -461,7 +461,11 @@ module clm_varctl
   ! 
   logical, public :: use_soil_nox = .false. ! true => add soil NOx emissions in N cycle
 
-
+  !----------------------------------------------------------
+  ! DENITRIFICATION switch 
+  !----------------------------------------------------------
+  ! 
+  logical, public :: use_delgrosso_dnlimit = .false. ! true => use the function from Del Grosso et al., 2000 to limit denitrification 
   
   !----------------------------------------------------------
   ! glacier_mec control variables: default values (may be overwritten by namelist)

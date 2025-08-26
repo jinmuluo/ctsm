@@ -12,7 +12,7 @@ module SoilBiogeochemNitrifDenitrifMod
   use clm_varpar                      , only : nlevdecomp
   use clm_varcon                      , only : rpi, grav
   use clm_varcon                      , only : d_con_g, d_con_w, secspday
-  use clm_varctl                      , only : use_lch4, use_soil_nox
+  use clm_varctl                      , only : use_lch4, use_soil_nox, use_delgrosso_dnlimit
   use abortutils                      , only : endrun
   use decompMod                       , only : bounds_type
   use SoilStatetype                   , only : soilstate_type
@@ -185,6 +185,7 @@ contains
     real(r8) :: r_min(bounds%begc:bounds%endc,1:nlevdecomp)
     real(r8) :: ratio_diffusivity_water_gas(bounds%begc:bounds%endc,1:nlevdecomp)
     real(r8) :: om_frac, diffus_millingtonquirk, diffus_moldrup
+    real(r8) :: inflection_a, m_fc, fd_WFPS   ! Del Grosso et al., 2000
     real(r8) :: anaerobic_frac_sat, r_psi_sat, r_min_sat ! scalar values in sat portion for averaging
     real(r8) :: organic_max              ! organic matter content (kg/m3) where
                                          ! soil is assumed to act like peat
@@ -385,6 +386,14 @@ contains
             fmax_denit_nitrate_vr(c,j) = (denit_nitrate_coef * smin_no3_massdens_vr(c,j)**denit_nitrate_exp)  &
                  / g_per_m3_sec__to__ug_per_gsoil_day
 
+            ! find the water limiting ratio, fd_WFPS
+            wfps_vr(c,j) = max(min(h2osoi_vol(c,j)/watsat(c, j), 1._r8), 0._r8) * 100._r8
+            if (use_delgrosso_dnlimit) then
+               m_fc = min(0.113_r8, diffus(c,j)) * -3.05_r8 + 0.36_r8
+               inflection_a = 9_r8 - m_fc * soil_co2_prod(c,j)
+               fd_WFPS = max(0.0_r8, min(1.0_r8, 0.5_r8 + atan(0.6_r8*rpi*(0.1_r8*wfps_vr(c,j) - inflection_a))/rpi))
+            end if 
+
             ! find limiting denitrification rate
             f_denit_base_vr(c,j) = max(min(fmax_denit_carbonsubstrate_vr(c,j), fmax_denit_nitrate_vr(c,j)),0._r8) 
 
@@ -394,8 +403,11 @@ contains
             endif
 
             ! limit to anoxic fraction of soils
-            pot_f_denit_vr(c,j) = f_denit_base_vr(c,j) * anaerobic_frac(c,j)
-
+            if (use_delgrosso_dnlimit) then
+                pot_f_denit_vr(c,j) = f_denit_base_vr(c,j) * fd_WFPS 
+            else
+                pot_f_denit_vr(c,j) = f_denit_base_vr(c,j) * anaerobic_frac(c,j)
+            end if
             ! now calculate the ratio of N2O to N2 from denitrification, following Del Grosso et al., 2000
             ! diffusivity constant (figure 6b)
             ratio_k1(c,j) = max(1.7_r8, 38.4_r8 - 350._r8 * diffus(c,j))
@@ -418,7 +430,6 @@ contains
             endif
 
             ! total water limitation function (Del Grosso et al., 2000, figure 7a)
-            wfps_vr(c,j) = max(min(h2osoi_vol(c,j)/watsat(c, j), 1._r8), 0._r8) * 100._r8
             fr_WFPS(c,j) = max(0.1_r8, 0.015_r8 * wfps_vr(c,j) - 0.32_r8)
 
             if (use_soil_nox) then

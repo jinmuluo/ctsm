@@ -318,7 +318,8 @@ contains
          use_lch4, use_nitrif_denitrif, use_extralakelayers, &
          use_vichydro, use_cn, use_cndv, use_crop, use_fertilizer, &
          use_grainproduct, use_snicar_frc, use_vancouver, use_mexicocity, use_noio, &
-         use_nguardrail, crop_residue_removal_frac, flush_gdd20, use_nvmovement, use_soil_nox
+         use_nguardrail, crop_residue_removal_frac, flush_gdd20, use_nvmovement, use_soil_nox, &
+         use_delgrosso_dnlimit
 
     ! SNICAR
     namelist /clm_inparm/ &
@@ -747,6 +748,7 @@ contains
     call mpi_bcast (use_noio, 1, MPI_LOGICAL, 0, mpicom, ier)
     call mpi_bcast (use_SSRE, 1, MPI_LOGICAL, 0, mpicom, ier)
     call mpi_bcast (use_soil_nox, 1, MPI_LOGICAL, 0, mpicom, ier)
+    call mpi_bcast (use_delgrosso_dnlimit, 1, MPI_LOGICAL, 0, mpicom, ier)
     ! initial file variables
     call mpi_bcast (nrevsn, len(nrevsn), MPI_CHARACTER, 0, mpicom, ier)
     call mpi_bcast (finidat, len(finidat), MPI_CHARACTER, 0, mpicom, ier)
@@ -1046,7 +1048,8 @@ contains
     write(iulog,*) '    use_noio = ', use_noio
     write(iulog,*) '    use_SSRE = ', use_SSRE
     write(iulog,*) '    use_soil_nox = ', use_soil_nox
-    
+    write(iulog,*) '    use_delgrosso_dnlimit = ', use_delgrosso_dnlimit
+ 
     write(iulog,*) 'input data files:'
     write(iulog,*) '   PFT physiology and parameters file = ',trim(paramfile)
     if (fsurdat == ' ') then

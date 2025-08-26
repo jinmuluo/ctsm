@@ -1003,6 +1003,12 @@ How LUNA and Photosynthesis (if needed) will get Leaf nitrogen content
    use_nvmovement cannot be true while use_soil_matrixcn is true
 </entry>
 
+<entry id="use_delgrosso_dnlimit" type="logical" category="bgc"
+       group="clm_inparm" value=".false.">
+   use_delgrosso_dnlimit = true use function from del grosso et al., 2000 to limit denitrification 
+   use_delgrosso_dnlimit = false use anaerobic fraction to limit denitrification 
+</entry>
+
 <entry id="paramfile" type="char*512" category="datasets"
        input_pathname="abs" group="clm_inparm" valid_values="" >
 Full pathname datafile with plant function type (PFT) constants combined with
