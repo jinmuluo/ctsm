@@ -52,7 +52,6 @@ integer, parameter, public :: num_fan3fluxes  = 9
 logical, parameter, private :: v2log = .FALSE.
 
 ! Canopy reduction switch
-logical, parameter, public :: use_canopy_reduction = .TRUE.
 logical, parameter, public :: use_upward_diffusion = .TRUE.
 !
 real(r8), private, parameter :: skip_size = 3600.0_r8   ! Time steps to skip the balance check at startup (sec)

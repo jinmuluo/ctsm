@@ -186,7 +186,6 @@ contains
     use subgridAveMod    , only: p2c
     use perf_mod         , only : t_startf, t_stopf
     use SoilBiogeochemDecompCascadeConType , only : decomp_cascade_con,  mimics_decomp, decomp_method
-    use Fan3Mod          , only:  use_canopy_reduction 
     !
     ! !ARGUMENTS:
     type(bounds_type)                       , intent(in)    :: bounds
@@ -733,7 +732,7 @@ contains
                f_n2_denit_vr(c, j) = n2_n2o_ratio_denit_vr(c,j) * f_n2o_denit_vr(c,j) 
  
                ! nox emissions after canopy capture
-               if (use_fan .and. use_canopy_reduction) then
+               if (use_fan) then
                   f_nox_nit_vr(c,j) = ratio_nox_n2o(c,j) * f_n2o_nit_vr(c,j) * CR(c)
                   f_nox_denit_vr(c,j) = 0.0_r8 * f_n2o_denit_vr(c,j) * CR(c)
                   f_canopy_to_soil_vr(c,j) = f_n2o_nit_vr(c,j) * ratio_nox_n2o(c,j) * (1 - CR(c)) 

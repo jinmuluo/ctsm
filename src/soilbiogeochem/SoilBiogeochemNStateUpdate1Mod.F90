@@ -19,7 +19,6 @@ module SoilBiogeochemNStateUpdate1Mod
   use CNSharedParamsMod                  , only : use_fun
   use ColumnType                         , only : col 
   use abortutils                         , only : endrun
-  use Fan3Mod                            , only : use_canopy_reduction
   use Fan3Mod                            , only : use_upward_diffusion
   !
   implicit none
@@ -297,7 +296,7 @@ contains
                ns%smin_nh4_vr_col(c,j) = ns%smin_nh4_vr_col(c,j) + nf%supplement_to_sminn_vr_col(c,j)*dt
                
                ! NOx captured by canopy is sent back to NH4+ pool
-               if (use_fan .and. use_canopy_reduction) then
+               if (use_fan) then
                   ns%smin_nh4_vr_col(c,j) = ns%smin_nh4_vr_col(c,j) + nf%f_canopy_to_soil_vr_col(c,j) * dt
                end if 
                ! update diagnostic total
