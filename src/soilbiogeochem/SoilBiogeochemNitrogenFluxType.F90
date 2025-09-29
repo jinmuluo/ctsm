@@ -425,7 +425,6 @@ contains
     this%fmax_denit_carbonsubstrate_vr_col (:,:) = nan
     allocate(this%fmax_denit_nitrate_vr_col         (begc:endc,1:nlevdecomp_full)) ; 
     this%fmax_denit_nitrate_vr_col         (:,:) = nan
-
     allocate(this%decomp_cascade_ntransfer_vr_col   (begc:endc,1:nlevdecomp_full,1:ndecomp_cascade_transitions ))
     allocate(this%decomp_cascade_sminn_flux_vr_col  (begc:endc,1:nlevdecomp_full,1:ndecomp_cascade_transitions ))
     allocate(this%decomp_cascade_ntransfer_col      (begc:endc,1:ndecomp_cascade_transitions                   ))
@@ -1492,7 +1491,6 @@ contains
              this%fmax_denit_carbonsubstrate_vr_col(i,j) = value_column 
              this%fmax_denit_nitrate_vr_col(i,j)         = value_column 
              this%f_denit_base_vr_col(i,j)               = value_column
-
              this%diffus_col(i,j)                        = value_column
              this%ratio_k1_col(i,j)                      = value_column
              this%ratio_no3_co2_col(i,j)                 = value_column

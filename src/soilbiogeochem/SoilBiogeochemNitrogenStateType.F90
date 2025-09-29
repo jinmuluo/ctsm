@@ -92,6 +92,11 @@ module SoilBiogeochemNitrogenStateType
      real(r8), pointer :: nitrate_totn_col(:)                  ! col (gN/m2) total Nitrate N in FAN pools
      real(r8), pointer :: CR_col(:)                            ! Canopy reduction coefficient, unitless 
 
+     ! rain pulse for soil NOx 
+     real(r8), pointer :: ldry_vr_col(:,:)                     ! dry period for rain pulses for NOx from nitrification [hours]
+     real(r8), pointer :: nox_rp_vr_col(:,:)                   ! pulsing factor [unitless]
+
+
      ! TEMPORARY STATE FOR FANv3   
      real(r8), pointer :: S_fmax_denit_carbonsubstrate_vr_col(:,:)
      real(r8), pointer :: S_anaerobic_frac_col(:,:)
@@ -298,7 +303,11 @@ contains
     allocate(this%totn_col                               (begc:endc)) ; this%totn_col                            (:) = nan
     allocate(this%totecosysn_col                         (begc:endc)) ; this%totecosysn_col                      (:) = nan
     allocate(this%totn_grc                 (bounds%begg:bounds%endg)) ; this%totn_grc                            (:) = nan
-    
+ 
+    !soil nox-rain pulse
+    allocate(this%ldry_vr_col          (begc:endc,1:nlevdecomp_full)) ; this%ldry_vr_col                       (:,:) = nan
+    allocate(this%nox_rp_vr_col        (begc:endc,1:nlevdecomp_full))  ; this%nox_rp_vr_col                    (:,:) = nan
+ 
   end subroutine InitAllocate
 
   !------------------------------------------------------------------------
@@ -810,6 +819,8 @@ contains
              do j = 1, nlevdecomp_full
                 this%smin_nh4_vr_col(c,j) = 0._r8
                 this%smin_no3_vr_col(c,j) = 0._r8
+                this%ldry_vr_col(c,j)     = 0._r8
+                this%nox_rp_vr_col(c,j)   = 0._r8
              end do
              this%smin_nh4_col(c) = 0._r8
              this%smin_no3_col(c) = 0._r8
@@ -1483,6 +1494,8 @@ contains
           if (use_nitrif_denitrif) then
              this%smin_no3_vr_col(i,j) = value_column
              this%smin_nh4_vr_col(i,j) = value_column
+             this%ldry_vr_col(i,j)     = value_column
+             this%nox_rp_vr_col(i,j)   = value_column
           end if
        end do
     end do

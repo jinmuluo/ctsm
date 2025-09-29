@@ -34,6 +34,7 @@ public :: eval_nitrate_loss
 public :: eval_nh4_upward
 public :: update_nitrate_pool
 public :: eval_cr
+public :: eval_rain_pulse
 
 ! indexes for array of different flux (used in Fan2CTSM.F90)
 integer, parameter, public :: n2o_n_id    = 1
@@ -498,6 +499,73 @@ end subroutine eval_nh4_upward
 
 
 ! ------------------  AMMONIUM UPWARD DIFFUSION ENDS HERE ----------------------
+
+! ------------------------------------------------------------------------------
+! RAIN ENHANCEMENT ON NOx EMISSION 
+! ------------------------------------------------------------------------------
+subroutine eval_rain_pulse(bounds, filter_bgc_soilc, num_bgc_soilc, h2osoi_vol, &
+                           h2osoi_vol_old, ldry_vr, nox_rp_vr)
+  !
+  ! This subroutine calculate the rain enhancement on NOx emission 
+  ! Is is called in 
+  !
+  use LandunitType         , only : lun
+  use ColumnType           , only : col
+  use landunit_varcon      , only : istsoil, istcrop
+  use clm_varpar           , only : nlevdecomp
+
+  type(bounds_type), intent(in) :: bounds
+  integer, intent(in) :: filter_bgc_soilc(:)
+  integer, intent(in) :: num_bgc_soilc
+  real(r8), intent(in) :: h2osoi_vol(bounds%begc:bounds%endc, 1:nlevdecomp)
+  real(r8), intent(in) :: h2osoi_vol_old(bounds%begc:bounds%endc, 1:nlevdecomp)
+
+  ! rain enhancement if drying period is more than 72 hours,larger than 1
+  real(r8), intent(inout) :: ldry_vr(bounds%begc:bounds%endc, 1:nlevdecomp) 
+  real(r8), intent(inout) :: nox_rp_vr(bounds%begc:bounds%endc, 1:nlevdecomp) 
+
+  ! local variables
+  integer :: j, l, c, fc
+  real(r8) :: dt     ! decomp timestep (seconds)
+  real(r8) :: dthr   ! decomp timestep (hours)  
+
+  dt = get_step_size_real()
+  dthr=dt/3600._r8
+
+  do j = 1, nlevdecomp
+     do fc = 1, num_bgc_soilc
+        c = filter_bgc_soilc(fc)
+        l = col%landunit(c)
+        if (lun%itype(l) == istsoil .or. lun%itype(l) == istcrop) then
+
+           if (h2osoi_vol(c,j)  < 0.30_r8 .and. nox_rp_vr(c,j) == 1.0_r8) then
+              if ((h2osoi_vol(c,j) - h2osoi_vol_old(c,j))> 0.01_r8 ) then
+                if (ldry_vr(c,j) > 72._r8) then
+                   nox_rp_vr(c,j) = 13._r8 *LOG(ldry_vr(c,j)) - 53.6_r8
+                else
+                   nox_rp_vr(c,j) = 1.0_r8
+                endif
+                ldry_vr(c,j) = 0.0_r8 
+              end if  
+           else
+             nox_rp_vr(c,j) = nox_rp_vr(c,j) * exp(-0.068_r8*dthr)
+           end if 
+
+           if (h2osoi_vol(c,j)  < 0.30_r8) then
+              ldry_vr(c,j) = ldry_vr(c,j) + dthr
+           end if 
+
+           if (nox_rp_vr(c,j) < 1.0_r8) then
+              nox_rp_vr(c, j) = 1.0_r8
+           end if
+ 
+        end if   ! land cover type 
+     end do ! column cycle
+  end do ! depth cycle
+
+end subroutine eval_rain_pulse
+
+! ------------------ RAIN ENHANCEMENT ON NOx EMISSION ENDS HERE ----------------------
 
  
 end module Fan3Mod

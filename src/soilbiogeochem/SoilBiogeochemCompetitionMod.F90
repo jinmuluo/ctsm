@@ -186,6 +186,7 @@ contains
     use subgridAveMod    , only: p2c
     use perf_mod         , only : t_startf, t_stopf
     use SoilBiogeochemDecompCascadeConType , only : decomp_cascade_con,  mimics_decomp, decomp_method
+    use Fan3Mod          , only: eval_rain_pulse
     !
     ! !ARGUMENTS:
     type(bounds_type)                       , intent(in)    :: bounds
@@ -278,9 +279,13 @@ contains
          f_nox_nit_vr                 => soilbiogeochem_nitrogenflux_inst%f_nox_nit_vr_col             , & ! Output: [real(r8) (:,:) ]  flux of NOx from nitrification [gN/m3/s]
          f_n2_denit_vr                => soilbiogeochem_nitrogenflux_inst%f_n2_denit_vr_col            , & ! Output: [real(r8] (:,:) ]  flux of N2 from denintrification [gN/m3/s]        
          f_canopy_to_soil_vr          => soilbiogeochem_nitrogenflux_inst%f_canopy_to_soil_vr_col      , & ! Output: [real(r8) (:,:) ]  NOx reduced by canopy, back to soil NH4+ [gN/m3/s]
-         ratio_nox_n2o                => soilbiogeochem_nitrogenflux_inst%ratio_nox_n2o_col            , & ! Input:  [real(r8) (:,:) ]
+         ratio_nox_n2o                => soilbiogeochem_nitrogenflux_inst%ratio_nox_n2o_col            , & ! Input/Output:  [real(r8) (:,:) ]
          nitrif_lost_as_n2o           => soilbiogeochem_nitrogenflux_inst%nitrif_lost_as_n2o_col       , & ! Input:  [real(r8) (:,:) ]  fraction of nitrification flux lost as n2o, unitless 
-         CR                           => soilbiogeochem_nitrogenstate_inst%CR_col                      , & ! Input:  [real(r8) (:)   ]  canopy reduction coefficience, unitless     
+         CR                           => soilbiogeochem_nitrogenstate_inst%CR_col                      , & ! Input:  [real(r8) (:)   ]  canopy reduction coefficience, unitless    
+         nox_rp_vr                    => soilbiogeochem_nitrogenstate_inst%nox_rp_vr_col               , & ! Output: [real(r8) (:,:) ]  rain pulse factor for NOx nitrification flux [unitless]
+         ldry_vr                      => soilbiogeochem_nitrogenstate_inst%ldry_vr_col                 , & ! In/Output: [real(r8) (:,:) ]   dry period counter for rain pulse in NOx nitrification flux [hours]
+         h2osoi_vol_old               => waterstatebulk_inst%h2osoi_vol_old_col                        , & ! Input:  [real(r8) (:,:)  ]  volumetric soil water previous time step [m3/m3]  (nlevgrnd)
+         h2osoi_vol                   => waterstatebulk_inst%h2osoi_vol_col                            , & ! Input:  [real(r8) (:,:) ]  volumetric soil water [m3/m3]
          supplement_to_sminn_vr       => soilbiogeochem_nitrogenflux_inst%supplement_to_sminn_vr_col   , & ! Output: [real(r8) (:,:) ]                                        
          sminn_to_plant_vr            => soilbiogeochem_nitrogenflux_inst%sminn_to_plant_vr_col        , & ! Output: [real(r8) (:,:) ]                                        
          potential_immob_vr           => soilbiogeochem_nitrogenflux_inst%potential_immob_vr_col       , & ! Input:  [real(r8) (:,:) ]                                        
@@ -554,6 +559,11 @@ contains
             end do
          end do
 
+         ! estimate the rain enhancement on the NOx emission
+         if (use_fan) then
+            call eval_rain_pulse(bounds, filter_bgc_soilc, num_bgc_soilc, h2osoi_vol, h2osoi_vol_old, ldry_vr, nox_rp_vr)
+         end if
+
          ! main column/vertical loop
          do j = 1, nlevdecomp  
             do fc=1,num_bgc_soilc
@@ -730,7 +740,12 @@ contains
                f_n2o_nit_vr(c,j) = f_nit_vr(c,j) * nitrif_lost_as_n2o(c,j) 
                f_n2o_denit_vr(c,j) = f_denit_vr(c,j) / (1._r8 + n2_n2o_ratio_denit_vr(c,j))
                f_n2_denit_vr(c, j) = n2_n2o_ratio_denit_vr(c,j) * f_n2o_denit_vr(c,j) 
- 
+               
+               ! add rain pulse to the NOx
+               if (use_fan) then
+                   ratio_nox_n2o(c,j) = nox_rp_vr(c,j) * ratio_nox_n2o(c,j)
+               end if
+
                ! nox emissions after canopy capture
                if (use_fan) then
                   f_nox_nit_vr(c,j) = ratio_nox_n2o(c,j) * f_n2o_nit_vr(c,j) * CR(c)
@@ -741,6 +756,11 @@ contains
                   f_nox_denit_vr(c,j) = 0.0_r8 * f_n2o_denit_vr(c,j)
                   f_canopy_to_soil_vr(c,j) = 0.0_r8 
                end if 
+
+               if ( (f_nox_nit_vr(c,j) + f_n2o_nit_vr(c,j) + f_canopy_to_soil_vr(c,j)) > f_nit_vr(c,j) ) then
+                 f_nox_nit_vr(c,j) =  (f_nit_vr(c,j) - f_n2o_nit_vr(c,j))* CR(c)
+                 f_canopy_to_soil_vr(c,j) =  (f_nit_vr(c,j) - f_n2o_nit_vr(c,j))* (1-CR(c))
+               end if
 
                ! this code block controls the addition of N to sminn pool
                ! to eliminate any N limitation, when Carbon_Only is set.  This lets the
