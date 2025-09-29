@@ -206,7 +206,7 @@ contains
     use clm_varcon, only : spval, ispval
     use decompMod, only : bounds_type
     use subgridAveMod, only: p2c
-    use Fan3Mod, only: use_canopy_reduction, use_upward_diffusion
+    use Fan3Mod, only: use_upward_diffusion
     !
     ! Evaluate the N fluxes and update the state of the FAN pools. Uses the fertilization
     ! flux determined in CropPhenology; the manure inputs come from the FAN stream. The
@@ -883,15 +883,12 @@ contains
        ns%nitrate_totn_col(c) = get_total_nitrate(c, ns) 
 
        ! NOx emission after captured by canopy.
-       if (use_canopy_reduction) then 
-          nf%canopy_to_soil_col(c) = ( 1 - ns%CR_col(c) ) * nf%nox_total_col(c) 
-          nf%nox_total_col(c) = ns%CR_col(c) * nf%nox_total_col(c)
-          ! This part of emission have been included in NOx total, they are outputted for diagnostic.
-          nf%nox_nitrify_total_col(c) = ns%CR_col(c) * nf%nox_nitrify_total_col(c)
-          nf%nox_denitrify_total_col(c) = ns%CR_col(c) * nf%nox_denitrify_total_col(c)
-       else
-          nf%canopy_to_soil_col(c) = 0.0_r8
-       end if 
+       nf%canopy_to_soil_col(c) = ( 1 - ns%CR_col(c) ) * nf%nox_total_col(c) 
+       nf%nox_total_col(c) = ns%CR_col(c) * nf%nox_total_col(c)
+       ! This part of emission have been included in NOx total, they are outputted for diagnostic.
+       nf%nox_nitrify_total_col(c) = ns%CR_col(c) * nf%nox_nitrify_total_col(c)
+       nf%nox_denitrify_total_col(c) = ns%CR_col(c) * nf%nox_denitrify_total_col(c)
+
        ! fanv3 balance check in all column solely
        if (do_balance_checks) then
           nno3 = nf%fert_no3_to_soil_col(c) + nf%manure_no3_to_soil_col(c)
