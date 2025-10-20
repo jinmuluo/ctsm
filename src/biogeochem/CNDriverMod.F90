@@ -378,7 +378,7 @@ contains
     ! calculate nitrification and denitrification rates (previously subroutine nitrif_denitrif called from CNDecompAlloc)
     if (use_nitrif_denitrif) then 
        call SoilBiogeochemNitrifDenitrif(bounds, num_bgc_soilc, filter_bgc_soilc, &
-            soilstate_inst, waterstatebulk_inst, temperature_inst, ch4_inst, &
+            soilstate_inst, waterstatebulk_inst, temperature_inst, ch4_inst, atm2lnd_inst, &
             soilbiogeochem_carbonflux_inst, soilbiogeochem_nitrogenstate_inst, soilbiogeochem_nitrogenflux_inst)
     end if
     call t_stopf('SoilBiogeochem')

@@ -24,6 +24,7 @@ module SoilBiogeochemNitrifDenitrifMod
   use SoilBiogeochemNitrogenStateType , only : soilbiogeochem_nitrogenstate_type
   use SoilBiogeochemNitrogenFluxType  , only : soilbiogeochem_nitrogenflux_type
   use ch4Mod                          , only : ch4_type
+  use atm2lndType                     , only : atm2lnd_type
   use ColumnType                      , only : col                
   !
   implicit none
@@ -141,7 +142,7 @@ contains
 
   !-----------------------------------------------------------------------
   subroutine SoilBiogeochemNitrifDenitrif(bounds, num_bgc_soilc, filter_bgc_soilc, &
-       soilstate_inst, waterstatebulk_inst, temperature_inst, ch4_inst, &
+       soilstate_inst, waterstatebulk_inst, temperature_inst, ch4_inst, atm2lnd_inst, &
        soilbiogeochem_carbonflux_inst, soilbiogeochem_nitrogenstate_inst, soilbiogeochem_nitrogenflux_inst)
     !
     ! !DESCRIPTION:
@@ -159,12 +160,13 @@ contains
     type(waterstatebulk_type)                   , intent(in)    :: waterstatebulk_inst
     type(temperature_type)                  , intent(in)    :: temperature_inst
     type(ch4_type)                          , intent(in)    :: ch4_inst
+    type(atm2lnd_type)                      , intent(in)    :: atm2lnd_inst
     type(soilbiogeochem_carbonflux_type)    , intent(in)    :: soilbiogeochem_carbonflux_inst
     type(soilbiogeochem_nitrogenstate_type) , intent(inout) :: soilbiogeochem_nitrogenstate_inst
     type(soilbiogeochem_nitrogenflux_type)  , intent(inout) :: soilbiogeochem_nitrogenflux_inst
     !
     ! !LOCAL VARIABLES:
-    integer  :: c, fc, reflev, j
+    integer  :: c, g, fc, reflev, j
     real(r8) :: soil_hr_vr(bounds%begc:bounds%endc,1:nlevdecomp) ! total soil respiration rate (g C / m3 / s)
     real(r8) :: g_per_m3__to__ug_per_gsoil
     real(r8) :: g_per_m3_sec__to__ug_per_gsoil_day
@@ -272,7 +274,7 @@ contains
       do j = 1, nlevdecomp
          do fc = 1,num_bgc_soilc
             c = filter_bgc_soilc(fc)
-
+            g = col%gridcell(c)
             !---------------- calculate soil anoxia state
             ! calculate gas diffusivity of soil at field capacity here
             ! use expression from methane code, but neglect OM for now
@@ -346,6 +348,9 @@ contains
             k_nitr_t_vr(c,j) = min(t_scalar(c,j), 1._r8)
 
             ! ph function from Parton et al., (2001, 1996)
+            if (use_fan) pH(c) = atm2lnd_inst%forc_soilph_grc(g)
+            if (pH(c) < 0.1) pH(c) = 6.5_r8
+            pH(c) = max(min(pH(c), 7.5), 5.5)
             k_nitr_ph_vr(c,j) = 0.56_r8 + atan(rpi * 0.45_r8 * (-5._r8+ pH(c)))/rpi
 
             ! moisture function-- assume the same moisture function as limits heterotrophic respiration
